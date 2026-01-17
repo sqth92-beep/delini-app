@@ -29,7 +29,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-const res = await fetch(`${BASE_URL}/api/${queryKey.join("/")}`, {      credentials: "include",
+const res = await fetch(`${BASE_URL}/${queryKey.join("/")}`, {      credentials: "include",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
