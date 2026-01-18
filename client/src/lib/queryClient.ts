@@ -1,8 +1,10 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 const BASE_URL = "https://delini-backend.onrender.com";
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    alert(`Server Error: ${res.status}\n${text}`);
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -12,15 +14,20 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`${BASE_URL}${url}`, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  try {
+    const res = await fetch(`${BASE_URL}${url}`, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error: any) {
+    alert(`Request Failed: ${error.message}`);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -29,15 +36,21 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-const res = await fetch(`${BASE_URL}/${queryKey.join("/")}`, {      credentials: "include",
-    });
+    try {
+      const res = await fetch(`${BASE_URL}/${queryKey.join("/")}`, {
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error: any) {
+      alert(`Query Error (${queryKey[0]}): ${error.message}`);
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
