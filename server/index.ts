@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -7,8 +8,20 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
-// Trust proxy for secure cookies behind Replit's proxy
 app.set("trust proxy", 1);
+
+// [Collaborative Solution: ChatGPT & Gemini]
+// Step 1: Enable CORS for APK and Web
+app.use(cors({
+  origin: [
+    "https://delini-frontend.onrender.com",
+    "capacitor://localhost",
+    "http://localhost"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"]
+}));
 
 declare module "http" {
   interface IncomingMessage {
@@ -26,7 +39,6 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// Session middleware for admin authentication
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
   throw new Error("SESSION_SECRET environment variable is required");
@@ -38,10 +50,10 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: true, // Required for sameSite: "none"
       httpOnly: true,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 12 * 60 * 60 * 1000, // 12 hours
+      sameSite: "none", // Critical for Android APK 
+      maxAge: 24 * 60 * 60 * 1000,
     },
   })
 );
@@ -94,9 +106,6 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -104,10 +113,6 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
