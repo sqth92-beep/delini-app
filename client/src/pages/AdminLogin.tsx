@@ -25,25 +25,29 @@ export default function AdminLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
-        credentials: "include",
       });
 
       const data = await res.json();
+      // Check for token in any possible format (Gemini + GPT extra safety)
+      const token = data.token || data.accessToken || data.jwt;
 
-      if (res.ok) {
-        toast({ title: "تم تسجيل الدخول بنجاح" });
+      if (res.ok && token) {
+        // Core fix for APK storage
+        localStorage.setItem("admin_token", token);
+        
+        toast({ title: "Login Successful" });
         setLocation("/admin");
       } else {
         toast({ 
-          title: "خطأ في تسجيل الدخول", 
-          description: data.message,
+          title: "Login Error", 
+          description: data.message || "Invalid credentials",
           variant: "destructive" 
         });
       }
     } catch {
       toast({ 
-        title: "خطأ في الاتصال", 
-        description: "تأكد من اتصالك بالإنترنت",
+        title: "Connection Error", 
+        description: "Please check your server connection",
         variant: "destructive" 
       });
     } finally {
@@ -55,13 +59,9 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-background p-4">
       <div className="mb-8">
         <Link href="/">
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            data-testid="button-back-to-site"
-          >
+          <Button variant="outline" className="gap-2">
             <ArrowRight className="w-4 h-4" />
-            القائمة الرئيسية
+            Main Menu
           </Button>
         </Link>
       </div>
@@ -71,13 +71,13 @@ export default function AdminLogin() {
           <div className="mx-auto w-28 h-28 mb-4">
             <img src={logoImg} alt="Delini" className="w-full h-full object-cover rounded-2xl" />
           </div>
-          <CardTitle className="text-2xl font-display">لوحة التحكم</CardTitle>
-          <p className="text-muted-foreground text-sm mt-2">سجل دخولك للوصول إلى لوحة التحكم</p>
+          <CardTitle className="text-2xl font-display">Control Panel</CardTitle>
+          <p className="text-muted-foreground text-sm mt-2">Sign in to manage your app</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">اسم المستخدم</label>
+              <label className="text-sm font-medium">Username</label>
               <div className="relative">
                 <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -87,12 +87,11 @@ export default function AdminLogin() {
                   onChange={(e) => setUsername(e.target.value)}
                   className="pr-10"
                   required
-                  data-testid="input-admin-username"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">كلمة المرور</label>
+              <label className="text-sm font-medium">Password</label>
               <div className="relative">
                 <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -102,29 +101,18 @@ export default function AdminLogin() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pr-10 pl-10"
                   required
-                  data-testid="input-admin-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  data-testid="button-toggle-password"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading}
-              data-testid="button-admin-login"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "تسجيل الدخول"
-              )}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign In"}
             </Button>
           </form>
         </CardContent>
