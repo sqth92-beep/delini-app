@@ -31,10 +31,12 @@ export default function AdminLogin() {
       });
 
       const data = await res.json();
-      const token = data.token || data.accessToken || data.jwt;
 
-      if (res.ok && token) {
-        localStorage.setItem("admin_token", token);
+      if (res.ok) {
+        if (data.token || data.accessToken || data.jwt) {
+          const token = data.token || data.accessToken || data.jwt;
+          localStorage.setItem("admin_token", token);
+        }
         
         toast({ title: "Login Successful" });
         setLocation("/admin");
