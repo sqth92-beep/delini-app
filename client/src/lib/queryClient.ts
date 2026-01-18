@@ -2,9 +2,10 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const BASE_URL = "https://delini-backend.onrender.com";
 
-async function throwIfResNotOk(res: Response) {
+async function throwIfResNotOk(res: Response, url: string) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
+    const text = await res.text();
+    alert(`DEBUG_LOG: Error at ${url}\nStatus: ${res.status}\nResponse: ${text.substring(0, 100)}`);
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -15,19 +16,21 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  const fullUrl = `${BASE_URL}${cleanUrl}`;
   try {
-    const res = await fetch(`${BASE_URL}${cleanUrl}`, {
+    const res = await fetch(fullUrl, {
       method,
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
       },
       body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
     });
-    await throwIfResNotOk(res);
+    await throwIfResNotOk(res, cleanUrl);
     return res;
   } catch (error: any) {
+    alert(`FETCH_EXCEPTION: ${error.message}`);
     throw error;
   }
 }
@@ -44,16 +47,15 @@ export const getQueryFn: <T>(options: {
         method: "GET",
         headers: {
           "Accept": "application/json",
-          "Cache-Control": "no-cache",
-        },
-        credentials: "include",
+          "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+        }
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;
       }
 
-      await throwIfResNotOk(res);
+      await throwIfResNotOk(res, cleanPath);
       return await res.json();
     } catch (error: any) {
       throw error;
@@ -65,8 +67,7 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       staleTime: 0,
-      refetchOnWindowFocus: true,
-      retry: 3,
+      retry: 0, 
     },
   },
 });
