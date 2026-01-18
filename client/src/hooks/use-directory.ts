@@ -2,16 +2,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { Review, Offer, BusinessResponse, City } from "@shared/schema";
 
+// Helper to get token and setup headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('admin_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 // ============================================
 // CITIES HOOKS
 // ============================================
 
-// GET /api/cities
 export function useCities() {
   return useQuery({
     queryKey: ['/api/cities'],
     queryFn: async () => {
-      const res = await fetch('/api/cities');
+      const res = await fetch('/api/cities', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch cities');
       return res.json() as Promise<City[]>;
     },
@@ -22,7 +33,6 @@ export function useCities() {
 // DIRECTORY HOOKS
 // ============================================
 
-// Category type that includes all fields from the API
 interface CategoryWithImage {
   id: number;
   name: string;
@@ -35,26 +45,23 @@ interface CategoryWithImage {
   sortOrder: number;
 }
 
-// GET /api/categories
 export function useCategories() {
   return useQuery({
     queryKey: [api.categories.list.path],
     queryFn: async () => {
-      const res = await fetch(api.categories.list.path);
+      const res = await fetch(api.categories.list.path, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch categories');
-      // Don't use Zod parse - it may strip fields. Return raw JSON.
       return res.json() as Promise<CategoryWithImage[]>;
     },
   });
 }
 
-// GET /api/categories/:id
 export function useCategory(id: number) {
   return useQuery({
     queryKey: [api.categories.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.categories.get.path, { id });
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error('Failed to fetch category');
       return api.categories.get.responses[200].parse(await res.json());
@@ -63,7 +70,6 @@ export function useCategory(id: number) {
   });
 }
 
-// GET /api/businesses
 export function useBusinesses(params?: { 
   categoryId?: number; 
   search?: string; 
@@ -89,20 +95,19 @@ export function useBusinesses(params?: {
 
       const url = `${api.businesses.list.path}?${searchParams.toString()}`;
       
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch businesses');
       return res.json() as Promise<(BusinessResponse & { distance?: number })[]>;
     },
   });
 }
 
-// GET /api/businesses/:id
 export function useBusiness(id: number) {
   return useQuery({
     queryKey: [api.businesses.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.businesses.get.path, { id });
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error('Failed to fetch business');
       return res.json() as Promise<BusinessResponse>;
@@ -111,12 +116,11 @@ export function useBusiness(id: number) {
   });
 }
 
-// GET /api/businesses/map
 export function useBusinessesWithLocation() {
   return useQuery({
     queryKey: ['/api/businesses/map'],
     queryFn: async () => {
-      const res = await fetch('/api/businesses/map');
+      const res = await fetch('/api/businesses/map', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch businesses');
       return res.json() as Promise<BusinessResponse[]>;
     },
@@ -127,12 +131,11 @@ export function useBusinessesWithLocation() {
 // REVIEWS HOOKS
 // ============================================
 
-// GET /api/businesses/:businessId/reviews
 export function useReviews(businessId: number) {
   return useQuery({
     queryKey: ['/api/businesses', businessId, 'reviews'],
     queryFn: async () => {
-      const res = await fetch(`/api/businesses/${businessId}/reviews`);
+      const res = await fetch(`/api/businesses/${businessId}/reviews`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch reviews');
       return res.json() as Promise<Review[]>;
     },
@@ -140,7 +143,6 @@ export function useReviews(businessId: number) {
   });
 }
 
-// POST /api/businesses/:businessId/reviews
 export function useCreateReview(businessId: number) {
   const queryClient = useQueryClient();
   
@@ -148,7 +150,7 @@ export function useCreateReview(businessId: number) {
     mutationFn: async (data: { visitorName: string; rating: number; comment?: string }) => {
       const res = await fetch(`/api/businesses/${businessId}/reviews`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) {
@@ -169,24 +171,22 @@ export function useCreateReview(businessId: number) {
 // OFFERS HOOKS
 // ============================================
 
-// GET /api/offers/active
 export function useActiveOffers() {
   return useQuery({
     queryKey: ['/api/offers/active'],
     queryFn: async () => {
-      const res = await fetch('/api/offers/active');
+      const res = await fetch('/api/offers/active', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json() as Promise<(Offer & { business?: BusinessResponse })[]>;
     },
   });
 }
 
-// GET /api/businesses/:businessId/offers
 export function useBusinessOffers(businessId: number) {
   return useQuery({
     queryKey: ['/api/businesses', businessId, 'offers'],
     queryFn: async () => {
-      const res = await fetch(`/api/businesses/${businessId}/offers`);
+      const res = await fetch(`/api/businesses/${businessId}/offers`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json() as Promise<Offer[]>;
     },
