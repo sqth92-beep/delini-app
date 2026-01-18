@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import cors from "cors";
 import { registerRoutes } from "./routes";
-import { setupAuth } from "./auth";
 import { createServer } from "http";
 
 const app = express();
@@ -14,8 +13,8 @@ app.use(express.urlencoded({ extended: false }));
 
 const corsOptions = {
   origin: [
-    "https://delini-app.onrender.com",
-    "capacitor://localhost",
+    "https://delini-app.onrender.com", // Web URL
+    "capacitor://localhost",           // Android APK
     "http://localhost",
     "http://localhost:5173"
   ],
@@ -27,10 +26,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret) {
-  throw new Error("SESSION_SECRET environment variable is required");
-}
+const sessionSecret = process.env.SESSION_SECRET || "default_secret_for_build";
 
 app.use(
   session({
@@ -38,16 +34,15 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      sameSite: "none",
-      secure: true,
+      sameSite: "none", // Allows APK & cross-origin cookies
+      secure: true,     // Required for sameSite: 'none'
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
     },
   })
 );
 
 (async () => {
-  setupAuth(app);
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -56,11 +51,10 @@ app.use(
     res.status(status).json({ message });
   });
 
-  const port = process.env.PORT || 5000;
-  server.listen({
+  const port = parseInt(process.env.PORT || "5000", 10);
+  httpServer.listen({
     port,
     host: "0.0.0.0",
-    reuseAddr: true,
   }, () => {
     console.log(`Server started on port ${port}`);
   });
