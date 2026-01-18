@@ -1,18 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import type { Review, Offer, BusinessResponse, City } from "@shared/schema";
-
-// Helper to get token and setup headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('admin_token');
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
+import { config } from "../lib/config";
 
 // ============================================
 // CITIES HOOKS
@@ -22,7 +11,9 @@ export function useCities() {
   return useQuery({
     queryKey: ['/api/cities'],
     queryFn: async () => {
-      const res = await fetch('/api/cities', { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl('/api/cities'), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch cities');
       return res.json() as Promise<City[]>;
     },
@@ -49,7 +40,9 @@ export function useCategories() {
   return useQuery({
     queryKey: [api.categories.list.path],
     queryFn: async () => {
-      const res = await fetch(api.categories.list.path, { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl(api.categories.list.path), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch categories');
       return res.json() as Promise<CategoryWithImage[]>;
     },
@@ -61,7 +54,9 @@ export function useCategory(id: number) {
     queryKey: [api.categories.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.categories.get.path, { id });
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl(url), { 
+        headers: config.getHeaders(false) 
+      });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error('Failed to fetch category');
       return api.categories.get.responses[200].parse(await res.json());
@@ -95,7 +90,9 @@ export function useBusinesses(params?: {
 
       const url = `${api.businesses.list.path}?${searchParams.toString()}`;
       
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl(url), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch businesses');
       return res.json() as Promise<(BusinessResponse & { distance?: number })[]>;
     },
@@ -107,7 +104,9 @@ export function useBusiness(id: number) {
     queryKey: [api.businesses.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.businesses.get.path, { id });
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl(url), { 
+        headers: config.getHeaders(false) 
+      });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error('Failed to fetch business');
       return res.json() as Promise<BusinessResponse>;
@@ -120,7 +119,9 @@ export function useBusinessesWithLocation() {
   return useQuery({
     queryKey: ['/api/businesses/map'],
     queryFn: async () => {
-      const res = await fetch('/api/businesses/map', { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl('/api/businesses/map'), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch businesses');
       return res.json() as Promise<BusinessResponse[]>;
     },
@@ -135,7 +136,9 @@ export function useReviews(businessId: number) {
   return useQuery({
     queryKey: ['/api/businesses', businessId, 'reviews'],
     queryFn: async () => {
-      const res = await fetch(`/api/businesses/${businessId}/reviews`, { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl(`/api/businesses/${businessId}/reviews`), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch reviews');
       return res.json() as Promise<Review[]>;
     },
@@ -148,9 +151,9 @@ export function useCreateReview(businessId: number) {
   
   return useMutation({
     mutationFn: async (data: { visitorName: string; rating: number; comment?: string }) => {
-      const res = await fetch(`/api/businesses/${businessId}/reviews`, {
+      const res = await fetch(config.getFullUrl(`/api/businesses/${businessId}/reviews`), {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: config.getContentHeaders(false),
         body: JSON.stringify(data),
       });
       if (!res.ok) {
@@ -175,7 +178,9 @@ export function useActiveOffers() {
   return useQuery({
     queryKey: ['/api/offers/active'],
     queryFn: async () => {
-      const res = await fetch('/api/offers/active', { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl('/api/offers/active'), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json() as Promise<(Offer & { business?: BusinessResponse })[]>;
     },
@@ -186,7 +191,9 @@ export function useBusinessOffers(businessId: number) {
   return useQuery({
     queryKey: ['/api/businesses', businessId, 'offers'],
     queryFn: async () => {
-      const res = await fetch(`/api/businesses/${businessId}/offers`, { headers: getAuthHeaders() });
+      const res = await fetch(config.getFullUrl(`/api/businesses/${businessId}/offers`), { 
+        headers: config.getHeaders(false) 
+      });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json() as Promise<Offer[]>;
     },
