@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -80,89 +80,41 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   const { data: adminData, isLoading: checkingAuth, error: authError } = useQuery({
     queryKey: ["/api/admin/me"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/me", { 
-          credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache"
-          }
-        });
-        if (!res.ok) {
-          if (res.status === 401) {
-            throw new Error("غير مسجل دخول");
-          }
-          throw new Error(`خطأ في المصادقة: ${res.status}`);
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("فشل المصادقة:", error);
-        throw error;
-      }
+      const res = await fetch("/api/admin/me", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authenticated");
+      return res.json();
     },
-    retry: 1,
-    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   useEffect(() => {
-    if (!checkingAuth && authError) {
-      console.log("توجيه إلى صفحة تسجيل الدخول بسبب:", authError);
+    if (authError) {
       setLocation("/admin/login");
     }
-  }, [checkingAuth, authError, setLocation]);
-
-  useEffect(() => {
-    if (adminData && !isInitialized) {
-      console.log("تم تسجيل دخول المشرف:", adminData.username);
-      setIsInitialized(true);
-    }
-  }, [adminData, isInitialized]);
+  }, [authError, setLocation]);
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await fetch("/api/admin/logout", { 
-        method: "POST", 
-        credentials: "include" 
-      });
+      await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
     },
     onSuccess: () => {
-      queryClient.clear();
       setLocation("/admin/login");
-    },
-    onError: (error) => {
-      toast({ 
-        title: "خطأ في تسجيل الخروج", 
-        description: error.message, 
-        variant: "destructive" 
-      });
     },
   });
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري التحقق من صلاحياتك...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!adminData && !authError) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري التحميل...</p>
-      </div>
-    );
-  }
-
-  if (!adminData) {
-    return null;
-  }
+  if (!adminData) return null;
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
@@ -170,11 +122,11 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex" dir="rtl">
+    <div className="min-h-screen bg-background flex">
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-4 left-4 z-50 md:hidden"
+        className="fixed top-4 right-4 z-50 md:hidden"
         onClick={() => setSidebarOpen(!sidebarOpen)}
         data-testid="button-toggle-sidebar"
       >
@@ -189,20 +141,14 @@ export default function AdminDashboard() {
       )}
 
       <aside className={`
-        fixed md:static inset-y-0 left-0 z-40
-        w-64 bg-card border-r border-border p-4 flex flex-col
+        fixed md:static inset-y-0 right-0 z-40
+        w-64 bg-card border-l border-border p-4 flex flex-col
         transform transition-transform duration-200 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        rtl:left-auto rtl:right-0 rtl:border-r-0 rtl:border-l
+        ${sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
       `}>
         <div className="mb-8">
           <h1 className="text-xl font-display font-bold text-primary">دلّيني</h1>
           <p className="text-sm text-muted-foreground">لوحة التحكم</p>
-          {adminData && (
-            <p className="text-xs text-muted-foreground mt-1">
-              مرحباً، {adminData.username}
-            </p>
-          )}
         </div>
 
         <nav className="space-y-2 flex-1">
@@ -289,7 +235,7 @@ export default function AdminDashboard() {
         </nav>
 
         <div className="border-t border-border pt-4 space-y-2">
-          <Link href="/">
+          <Link href="/preview">
             <Button
               variant="outline"
               className="w-full justify-start gap-2 border-primary text-primary hover:bg-primary/10"
@@ -302,51 +248,30 @@ export default function AdminDashboard() {
           <Link href="/">
             <Button variant="ghost" className="w-full justify-start gap-2">
               <Home className="w-5 h-5" />
-              الصفحة الرئيسية
+              القائمة الرئيسية
             </Button>
           </Link>
           <Button
             variant="ghost"
             className="w-full justify-start gap-2 text-destructive hover:text-destructive"
             onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
             data-testid="button-logout"
           >
-            {logoutMutation.isPending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <LogOut className="w-5 h-5" />
-            )}
+            <LogOut className="w-5 h-5" />
             تسجيل الخروج
           </Button>
         </div>
       </aside>
 
-      <main className="flex-1 p-4 md:p-8 overflow-auto">
+      <main className="flex-1 p-8 overflow-auto">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              لوحة التحكم / 
-              <span className="font-medium text-foreground mr-1">
-                {activeTab === "dashboard" && "الرئيسية"}
-                {activeTab === "categories" && "الأقسام"}
-                {activeTab === "cities" && "المدن"}
-                {activeTab === "businesses" && "المحلات"}
-                {activeTab === "subscriptions" && "الاشتراكات"}
-                {activeTab === "offers" && "العروض"}
-                {activeTab === "reviews" && "المراجعات"}
-                {activeTab === "settings" && "المظهر"}
-              </span>
-            </span>
-          </div>
           <Link href="/">
             <Button variant="outline" className="gap-2" data-testid="button-back-to-site">
               <ArrowRight className="w-4 h-4" />
-              العودة للموقع
+              القائمة الرئيسية
             </Button>
           </Link>
         </div>
-        
         {activeTab === "dashboard" && <DashboardTab />}
         {activeTab === "categories" && <CategoriesTab />}
         {activeTab === "cities" && <CitiesTab />}
@@ -391,94 +316,27 @@ interface ActivityLog {
 function DashboardTab() {
   const { toast } = useToast();
 
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<Statistics>({
+  const { data: stats, isLoading: statsLoading } = useQuery<Statistics>({
     queryKey: ["/api/admin/statistics"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/statistics", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          console.warn("فشل تحميل الإحصائيات، استخدام بيانات تجريبية");
-          return {
-            totalBusinesses: 24,
-            verifiedBusinesses: 8,
-            vipBusinesses: 5,
-            normalBusinesses: 15,
-            trialBusinesses: 4,
-            totalReviews: 156,
-            averageRating: "4.3",
-            activeOffers: 12,
-            totalOffers: 18,
-            totalCategories: 8,
-            businessesByCategory: [
-              { name: "مطاعم", count: 8 },
-              { name: "مقاهي", count: 6 },
-              { name: "محلات تجارية", count: 5 },
-              { name: "خدمات", count: 3 },
-              { name: "ترفيه", count: 2 }
-            ],
-            recentReviews: 42,
-            monthlyRevenue: 45000,
-            topRatedBusinesses: [
-              { id: 1, name: "مطعم اللؤلؤة", rating: 4.9, reviewCount: 45 },
-              { id: 2, name: "كافيه النخلة", rating: 4.8, reviewCount: 38 },
-              { id: 3, name: "سوق الذهب", rating: 4.7, reviewCount: 29 }
-            ],
-            mostReviewedBusinesses: [
-              { id: 1, name: "مطعم اللؤلؤة", rating: 4.9, reviewCount: 45 },
-              { id: 2, name: "كافيه النخلة", rating: 4.8, reviewCount: 38 },
-              { id: 4, name: "محل الأثاث", rating: 4.5, reviewCount: 32 }
-            ]
-          };
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("خطأ في تحميل الإحصائيات:", error);
-        throw error;
-      }
+      const res = await fetch("/api/admin/statistics");
+      return res.json();
     },
-    retry: 1,
   });
 
-  const { data: activityLogs, isLoading: logsLoading } = useQuery<ActivityLog[]>({
+  const { data: activityLogs } = useQuery<ActivityLog[]>({
     queryKey: ["/api/admin/activity-logs"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/activity-logs?limit=10", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          return [
-            { id: 1, action: "إضافة", entityType: "محل", entityId: 25, details: "مطعم جديد", adminUsername: "admin", createdAt: new Date().toISOString() },
-            { id: 2, action: "تعديل", entityType: "قسم", entityId: 3, details: "تحديث الأيقونة", adminUsername: "admin", createdAt: new Date(Date.now() - 3600000).toISOString() },
-            { id: 3, action: "حذف", entityType: "عرض", entityId: 12, details: "عرض منتهي", adminUsername: "admin", createdAt: new Date(Date.now() - 7200000).toISOString() }
-          ];
-        }
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/activity-logs?limit=10");
+      return res.json();
     },
   });
 
-  const { data: businesses, isLoading: businessesLoading } = useQuery<BusinessResponse[]>({
+  const { data: businesses } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/businesses", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          return [
-            { id: 1, name: "مطعم اللؤلؤة", categoryId: 1, isVerified: true, subscriptionTier: "vip", joinDate: new Date(Date.now() - 86400000 * 45).toISOString(), subscriptionActivatedAt: new Date(Date.now() - 86400000 * 15).toISOString(), imageUrl: "", category: { id: 1, name: "مطاعم" } } as any,
-            { id: 2, name: "كافيه النخلة", categoryId: 2, isVerified: true, subscriptionTier: "regular", joinDate: new Date(Date.now() - 86400000 * 90).toISOString(), subscriptionActivatedAt: new Date(Date.now() - 86400000 * 5).toISOString(), imageUrl: "", category: { id: 2, name: "مقاهي" } } as any
-          ];
-        }
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/businesses");
+      return res.json();
     },
   });
 
@@ -490,6 +348,7 @@ function DashboardTab() {
     daysRemaining: getSubscriptionInfo(b.joinDate, b.subscriptionActivatedAt, b.subscriptionTier).daysRemaining
   })) || [];
 
+  // Expired subscriptions - hidden from public view
   const expiredSubscriptions = businesses?.filter(b => {
     const subInfo = getSubscriptionInfo(b.joinDate, b.subscriptionActivatedAt, b.subscriptionTier);
     return subInfo.status === 'expired' || subInfo.status === 'trial_expired';
@@ -500,59 +359,35 @@ function DashboardTab() {
 
   const handleExport = async (type: 'businesses' | 'subscriptions' | 'reviews') => {
     try {
-      const res = await fetch(`/api/admin/export/${type}`, {
-        headers: { "Cache-Control": "no-cache" }
-      });
-      if (!res.ok) throw new Error(`خطأ في التصدير: ${res.status}`);
-      
+      const res = await fetch(`/api/admin/export/${type}`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${type}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `${type}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast({ title: "تم تصدير البيانات بنجاح" });
-    } catch (error) {
-      console.error("خطأ في تصدير البيانات:", error);
-      toast({ 
-        title: "خطأ في تصدير البيانات", 
-        description: "تعذر تصدير الملف. يرجى المحاولة مرة أخرى.",
-        variant: "destructive" 
-      });
+    } catch {
+      toast({ title: "خطأ في تصدير البيانات", variant: "destructive" });
     }
   };
 
-  const isLoading = statsLoading || logsLoading || businessesLoading;
-
-  if (isLoading) {
+  if (statsLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
+      <div className="flex justify-center py-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل الإحصائيات...</p>
-      </div>
-    );
-  }
-
-  if (statsError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل الإحصائيات</p>
-        <Button variant="outline" onClick={() => window.location.reload()}>
-          إعادة المحاولة
-        </Button>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-display font-bold">نظرة عامة</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => handleExport('businesses')} data-testid="button-export-businesses">
             تصدير المحلات
           </Button>
@@ -614,7 +449,7 @@ function DashboardTab() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المحلات</CardTitle>
@@ -653,7 +488,7 @@ function DashboardTab() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المراجعات</CardTitle>
@@ -696,7 +531,7 @@ function DashboardTab() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-primary">
-            {(stats?.monthlyRevenue || 0).toLocaleString('ar-EG')} ر.س
+            {(stats?.monthlyRevenue || 0).toLocaleString('en')} ر.س
           </div>
           <p className="text-xs text-muted-foreground">
             VIP: 10,000 ر.س | عادي: 5,000 ر.س
@@ -704,22 +539,22 @@ function DashboardTab() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">أعلى المحلات تقييماً</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats?.topRatedBusinesses?.slice(0, 5).map((b, i) => (
+              {stats?.topRatedBusinesses?.map((b, i) => (
                 <div key={b.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-sm flex items-center justify-center">
                       {i + 1}
                     </span>
                     <span className="truncate">{b.name}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-sm flex-shrink-0">
+                  <div className="flex items-center gap-1 text-sm">
                     <Star className="w-4 h-4 text-primary fill-primary" />
                     <span>{b.rating?.toFixed(1) || '-'}</span>
                   </div>
@@ -735,7 +570,7 @@ function DashboardTab() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats?.businessesByCategory?.slice(0, 5).map((cat) => (
+              {stats?.businessesByCategory?.map((cat) => (
                 <div key={cat.name} className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span>{cat.name}</span>
@@ -760,15 +595,13 @@ function DashboardTab() {
           {activityLogs && activityLogs.length > 0 ? (
             <div className="space-y-2">
               {activityLogs.map((log) => (
-                <div key={log.id} className="flex flex-col sm:flex-row sm:items-center justify-between text-sm border-b border-border pb-2 last:border-0 gap-1">
-                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <div key={log.id} className="flex items-center justify-between text-sm border-b border-border pb-2 last:border-0">
+                  <div className="flex items-center gap-2">
                     <span className="font-medium">{log.action}</span>
                     <span className="text-muted-foreground">{log.entityType}</span>
-                    {log.details && (
-                      <span className="text-muted-foreground truncate">- {log.details}</span>
-                    )}
+                    {log.details && <span className="text-muted-foreground">- {log.details}</span>}
                   </div>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(log.createdAt).toLocaleDateString('ar-EG')}
                   </span>
                 </div>
@@ -789,25 +622,11 @@ function CategoriesTab() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
-  const { data: categories, isLoading, error } = useQuery<Category[]>({
+  const { data: categories, isLoading } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/categories", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          console.warn("فشل تحميل الأقسام، استخدام بيانات تجريبية");
-          return [
-            { id: 1, name: "مطاعم", nameEn: "Restaurants", slug: "restaurants", icon: "Utensils", imageUrl: null, keywords: ["أكل", "طعام", "مطعم"], keywordsEn: ["food", "restaurant"] },
-            { id: 2, name: "مقاهي", nameEn: "Cafes", slug: "cafes", icon: "Coffee", imageUrl: null, keywords: ["قهوة", "مشروبات", "كافيه"], keywordsEn: ["coffee", "cafe"] }
-          ];
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("خطأ في تحميل الأقسام:", error);
-        throw error;
-      }
+      const res = await fetch("/api/admin/categories");
+      return res.json();
     },
   });
 
@@ -818,10 +637,7 @@ function CategoriesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -831,11 +647,7 @@ function CategoriesTab() {
       setIsAddOpen(false);
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الإضافة", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -846,10 +658,7 @@ function CategoriesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -859,23 +668,14 @@ function CategoriesTab() {
       setEditingCategory(null);
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في التحديث", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/categories/${id}`, { 
-        method: "DELETE" 
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      const res = await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
@@ -883,38 +683,13 @@ function CategoriesTab() {
       toast({ title: "تم حذف القسم" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الحذف", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل الأقسام...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل الأقسام</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] })}>
-          إعادة المحاولة
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-display font-bold">الأقسام</h2>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
@@ -935,22 +710,15 @@ function CategoriesTab() {
         </Dialog>
       </div>
 
-      {categories && categories.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Grid3X3 className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">لا توجد أقسام مضافة</p>
-            <Button onClick={() => setIsAddOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              إضافة أول قسم
-            </Button>
-          </CardContent>
-        </Card>
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
       ) : (
         <div className="grid gap-4">
           {categories?.map((category) => (
             <Card key={category.id}>
-              <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
+              <CardContent className="flex items-center justify-between gap-4 p-4">
                 <div className="flex items-center gap-4 min-w-0 flex-1">
                   <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
                     {category.imageUrl ? (
@@ -958,17 +726,10 @@ function CategoriesTab() {
                         src={category.imageUrl} 
                         alt={category.name} 
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                            `<div class="w-full h-full flex items-center justify-center bg-primary/10">
-                              <span class="text-2xl">${category.icon || '📁'}</span>
-                            </div>`;
-                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                        <span className="text-2xl">{category.icon || '📁'}</span>
+                        <span className="text-2xl">{category.icon}</span>
                       </div>
                     )}
                   </div>
@@ -980,7 +741,7 @@ function CategoriesTab() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <Dialog open={editingCategory?.id === category.id} onOpenChange={(open) => !open && setEditingCategory(null)}>
                     <DialogTrigger asChild>
                       <Button 
@@ -1026,13 +787,8 @@ function CategoriesTab() {
                         <AlertDialogAction
                           onClick={() => deleteMutation.mutate(category.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          disabled={deleteMutation.isPending}
                         >
-                          {deleteMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            "حذف"
-                          )}
+                          حذف
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -1068,93 +824,38 @@ function CategoryForm({
     e.preventDefault();
     const keywordsArray = keywords.split(",").map(k => k.trim()).filter(k => k);
     const keywordsEnArray = keywordsEn.split(",").map(k => k.trim()).filter(k => k);
-    
-    const formData = { 
-      name: name.trim(),
-      nameEn: nameEn.trim() || null,
-      slug: slug.trim().toLowerCase().replace(/\s+/g, '-'),
-      icon: icon.trim(),
-      imageUrl: imageUrl.trim() || null,
+    onSubmit({ 
+      name, 
+      nameEn, 
+      slug, 
+      icon, 
+      imageUrl: imageUrl || null,
       keywords: keywordsArray.length > 0 ? keywordsArray : null,
       keywordsEn: keywordsEnArray.length > 0 ? keywordsEnArray : null,
-    };
-    
-    onSubmit(formData);
-  };
-
-  const generateSlug = () => {
-    if (!slug && name) {
-      const generatedSlug = name
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
-      setSlug(generatedSlug);
-    }
+    } as any);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <label className="text-sm font-medium">الاسم بالعربية *</label>
-        <Input 
-          value={name} 
-          onChange={(e) => setName(e.target.value)}
-          onBlur={generateSlug}
-          required 
-          data-testid="input-category-name" 
-          placeholder="مثال: مطاعم"
-        />
+        <Input value={name} onChange={(e) => setName(e.target.value)} required data-testid="input-category-name" />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">الاسم بالإنجليزية</label>
-        <Input 
-          value={nameEn} 
-          onChange={(e) => setNameEn(e.target.value)} 
-          data-testid="input-category-name-en" 
-          placeholder="مثال: Restaurants"
-        />
+        <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} data-testid="input-category-name-en" />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">المعرف (slug) *</label>
-        <div className="flex gap-2">
-          <Input 
-            value={slug} 
-            onChange={(e) => setSlug(e.target.value)} 
-            required 
-            data-testid="input-category-slug"
-            placeholder="مثال: restaurants"
-            className="flex-1"
-          />
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={generateSlug}
-            className="whitespace-nowrap"
-          >
-            توليد
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">يستخدم في الروابط - يجب أن يكون بالإنجليزية</p>
+        <Input value={slug} onChange={(e) => setSlug(e.target.value)} required data-testid="input-category-slug" />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">الأيقونة *</label>
-        <Input 
-          value={icon} 
-          onChange={(e) => setIcon(e.target.value)} 
-          required 
-          placeholder="مثال: Utensils أو Coffee" 
-          data-testid="input-category-icon" 
-        />
-        <p className="text-xs text-muted-foreground">اسم أيقونة من Lucide React Icons</p>
+        <Input value={icon} onChange={(e) => setIcon(e.target.value)} required placeholder="مثال: Utensils" data-testid="input-category-icon" />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">رابط الصورة</label>
-        <Input 
-          value={imageUrl} 
-          onChange={(e) => setImageUrl(e.target.value)} 
-          placeholder="https://example.com/image.jpg" 
-          data-testid="input-category-image" 
-        />
+        <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." data-testid="input-category-image" />
         {imageUrl && (
           <div className="mt-2 relative w-full h-32 bg-muted rounded-lg overflow-hidden">
             <img 
@@ -1173,32 +874,22 @@ function CategoryForm({
         <Input 
           value={keywords} 
           onChange={(e) => setKeywords(e.target.value)} 
-          placeholder="أكل, طعام, سندويج, مطعم (افصل بفاصلة)"
+          placeholder="مثال: أكل, طعام, سندويج, مطعم (افصل بفاصلة)"
           data-testid="input-category-keywords" 
         />
-        <p className="text-xs text-muted-foreground">تفصل بين الكلمات بفاصلة - تستخدم لتحسين نتائج البحث</p>
+        <p className="text-xs text-muted-foreground">افصل بين الكلمات بفاصلة - تستخدم لتحسين نتائج البحث</p>
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">كلمات مفتاحية بالإنجليزية</label>
         <Input 
           value={keywordsEn} 
           onChange={(e) => setKeywordsEn(e.target.value)} 
-          placeholder="food, eat, sandwich, restaurant"
+          placeholder="e.g: food, eat, sandwich, restaurant"
           data-testid="input-category-keywords-en" 
         />
       </div>
-      <Button 
-        type="submit" 
-        className="w-full" 
-        disabled={isLoading || !name.trim() || !slug.trim() || !icon.trim()} 
-        data-testid="button-submit-category"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin ml-2" />
-            جاري {category ? "التحديث" : "الإضافة"}...
-          </>
-        ) : category ? "تحديث" : "إضافة"}
+      <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-submit-category">
+        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : category ? "تحديث" : "إضافة"}
       </Button>
     </form>
   );
@@ -1220,26 +911,11 @@ function CitiesTab() {
   const [newCityNameEn, setNewCityNameEn] = useState("");
   const [newCitySlug, setNewCitySlug] = useState("");
 
-  const { data: cities, isLoading, error } = useQuery<City[]>({
+  const { data: cities, isLoading } = useQuery<City[]>({
     queryKey: ["/api/admin/cities"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/cities", { 
-          credentials: "include",
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          console.warn("فشل تحميل المدن، استخدام بيانات تجريبية");
-          return [
-            { id: 1, name: "البصرة", nameEn: "Basra", slug: "basra" },
-            { id: 2, name: "بغداد", nameEn: "Baghdad", slug: "baghdad" }
-          ];
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("خطأ في تحميل المدن:", error);
-        throw error;
-      }
+      const res = await fetch("/api/admin/cities", { credentials: "include" });
+      return res.json();
     },
   });
 
@@ -1251,10 +927,7 @@ function CitiesTab() {
         credentials: "include",
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -1267,11 +940,7 @@ function CitiesTab() {
       setNewCitySlug("");
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الإضافة", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1281,10 +950,7 @@ function CitiesTab() {
         method: "DELETE",
         credentials: "include"
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] });
@@ -1292,68 +958,26 @@ function CitiesTab() {
       toast({ title: "تم حذف المدينة" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الحذف", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCityName.trim() || !newCitySlug.trim()) {
-      toast({ 
-        title: "خطأ", 
-        description: "الاسم والرابط مطلوبان", 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: "الاسم والرابط مطلوبان", variant: "destructive" });
       return;
     }
-    
-    const slug = newCitySlug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-    
     createMutation.mutate({
       name: newCityName.trim(),
-      nameEn: newCityNameEn.trim() || newCityName.trim(),
-      slug: slug,
+      nameEn: newCityNameEn.trim(),
+      slug: newCitySlug.trim().toLowerCase().replace(/\s+/g, '-'),
     });
   };
 
-  const generateSlug = () => {
-    if (!newCitySlug && newCityName) {
-      const slug = newCityName
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
-      setNewCitySlug(slug);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل المدن...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل المدن</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/cities"] })}>
-          إعادة المحاولة
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-display font-bold">المدن</h2>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
@@ -1372,9 +996,7 @@ function CitiesTab() {
                 <Input
                   value={newCityName}
                   onChange={(e) => setNewCityName(e.target.value)}
-                  onBlur={generateSlug}
                   placeholder="مثال: البصرة"
-                  required
                   data-testid="input-city-name"
                 />
               </div>
@@ -1383,51 +1005,80 @@ function CitiesTab() {
                 <Input
                   value={newCityNameEn}
                   onChange={(e) => setNewCityNameEn(e.target.value)}
-                  placeholder="مثال: Basra"
+                  placeholder="e.g: Basra"
                   data-testid="input-city-name-en"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">الرابط (Slug) *</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={newCitySlug}
-                    onChange={(e) => setNewCitySlug(e.target.value)}
-                    placeholder="مثال: basra"
-                    required
-                    data-testid="input-city-slug"
-                    className="flex-1"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={generateSlug}
-                    className="whitespace-nowrap"
-                  >
-                    توليد
-                  </Button>
-                </div>
+                <Input
+                  value={newCitySlug}
+                  onChange={(e) => setNewCitySlug(e.target.value)}
+                  placeholder="مثال: basra"
+                  data-testid="input-city-slug"
+                />
                 <p className="text-xs text-muted-foreground">يستخدم في الروابط - بالإنجليزية فقط</p>
               </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={createMutation.isPending || !newCityName.trim() || !newCitySlug.trim()} 
-                data-testid="button-submit-city"
-              >
-                {createMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                    جاري الإضافة...
-                  </>
-                ) : "إضافة"}
+              <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-submit-city">
+                {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "إضافة"}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {cities && cities.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : cities && cities.length > 0 ? (
+        <div className="grid gap-4">
+          {cities.map((city) => (
+            <Card key={city.id}>
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold">{city.name}</h3>
+                    <p className="text-sm text-muted-foreground">{city.nameEn || city.slug}</p>
+                  </div>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-destructive hover:text-destructive"
+                      data-testid={`button-delete-city-${city.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        سيتم حذف مدينة "{city.name}" نهائياً. المحلات المرتبطة بهذه المدينة لن تتأثر.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteMutation.mutate(city.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        حذف
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <MapPin className="w-12 h-12 text-muted-foreground mb-4" />
@@ -1438,63 +1089,6 @@ function CitiesTab() {
             </Button>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4">
-          {cities.map((city) => (
-            <Card key={city.id}>
-              <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold truncate">{city.name}</h3>
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span className="truncate">{city.nameEn || city.slug}</span>
-                      <span className="text-xs bg-muted px-2 py-0.5 rounded">/{city.slug}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-destructive hover:text-destructive"
-                        data-testid={`button-delete-city-${city.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          سيتم حذف مدينة "{city.name}" نهائياً. المحلات المرتبطة بهذه المدينة لن تتأثر.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteMutation.mutate(city.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          disabled={deleteMutation.isPending}
-                        >
-                          {deleteMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            "حذف"
-                          )}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       )}
     </div>
   );
@@ -1507,40 +1101,23 @@ function BusinessesTab() {
   const [editingBusiness, setEditingBusiness] = useState<BusinessResponse | null>(null);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
 
-  const { data: businesses, isLoading, error } = useQuery<BusinessResponse[]>({
+  const { data: businesses, isLoading } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/businesses", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          console.warn("فشل تحميل المحلات، استخدام بيانات تجريبية");
-          return [];
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("خطأ في تحميل المحلات:", error);
-        throw error;
-      }
+      const res = await fetch("/api/admin/businesses");
+      return res.json();
     },
   });
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/categories", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/categories");
+      return res.json();
     },
   });
 
+  // Group businesses by category
   const businessesByCategory = (businesses || []).reduce((acc, business) => {
     const catId = business.categoryId?.toString() || "uncategorized";
     if (!acc[catId]) acc[catId] = [];
@@ -1548,6 +1125,7 @@ function BusinessesTab() {
     return acc;
   }, {} as Record<string, BusinessResponse[]>);
 
+  // Filter businesses based on selected category
   const filteredBusinesses = selectedCategoryFilter === "all" 
     ? businesses 
     : businesses?.filter(b => b.categoryId?.toString() === selectedCategoryFilter);
@@ -1559,10 +1137,7 @@ function BusinessesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -1572,11 +1147,7 @@ function BusinessesTab() {
       setIsAddOpen(false);
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الإضافة", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1587,10 +1158,7 @@ function BusinessesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -1600,23 +1168,14 @@ function BusinessesTab() {
       setEditingBusiness(null);
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في التحديث", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/businesses/${id}`, { 
-        method: "DELETE" 
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      const res = await fetch(`/api/admin/businesses/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
@@ -1624,42 +1183,17 @@ function BusinessesTab() {
       toast({ title: "تم حذف المحل" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الحذف", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل المحلات...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل المحلات</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] })}>
-          إعادة المحاولة
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <h2 className="text-2xl font-display font-bold">المحلات</h2>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3">
           <Select value={selectedCategoryFilter} onValueChange={setSelectedCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-48" data-testid="filter-category">
+            <SelectTrigger className="w-48" data-testid="filter-category">
               <SelectValue placeholder="جميع الأقسام" />
             </SelectTrigger>
             <SelectContent>
@@ -1673,12 +1207,12 @@ function BusinessesTab() {
           </Select>
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-business">
+              <Button className="gap-2" data-testid="button-add-business">
                 <Plus className="w-4 h-4" />
                 إضافة محل
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>إضافة محل جديد</DialogTitle>
               </DialogHeader>
@@ -1692,7 +1226,12 @@ function BusinessesTab() {
         </div>
       </div>
 
-      {selectedCategoryFilter === "all" ? (
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : selectedCategoryFilter === "all" ? (
+        // Grouped view by category
         <div className="space-y-6">
           {categories?.map((category) => {
             const categoryBusinesses = businessesByCategory[category.id.toString()] || [];
@@ -1705,7 +1244,7 @@ function BusinessesTab() {
                   {category.name}
                   <span className="text-sm text-muted-foreground font-normal">({categoryBusinesses.length})</span>
                 </h3>
-                <div className="grid gap-3">
+                <div className="grid gap-3 pr-4">
                   {categoryBusinesses.map((business) => (
                     <BusinessCard 
                       key={business.id}
@@ -1722,47 +1261,22 @@ function BusinessesTab() {
               </div>
             );
           })}
-          
-          {(!businesses || businesses.length === 0) && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Store className="w-12 h-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">لا توجد محلات مضافة</p>
-                <Button onClick={() => setIsAddOpen(true)} className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  إضافة أول محل
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </div>
       ) : (
+        // Filtered view - single category
         <div className="grid gap-4">
-          {filteredBusinesses?.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Store className="w-12 h-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">لا توجد محلات في هذا القسم</p>
-                <Button onClick={() => setIsAddOpen(true)} className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  إضافة محل جديد
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredBusinesses?.map((business) => (
-              <BusinessCard 
-                key={business.id}
-                business={business}
-                categories={categories || []}
-                editingBusiness={editingBusiness}
-                setEditingBusiness={setEditingBusiness}
-                onUpdate={(id, data) => updateMutation.mutate({ id, data })}
-                onDelete={(id) => deleteMutation.mutate(id)}
-                isUpdating={updateMutation.isPending}
-              />
-            ))
-          )}
+          {filteredBusinesses?.map((business) => (
+            <BusinessCard 
+              key={business.id}
+              business={business}
+              categories={categories || []}
+              editingBusiness={editingBusiness}
+              setEditingBusiness={setEditingBusiness}
+              onUpdate={(id, data) => updateMutation.mutate({ id, data })}
+              onDelete={(id) => deleteMutation.mutate(id)}
+              isUpdating={updateMutation.isPending}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -1795,19 +1309,14 @@ function BusinessCard({
 
   return (
     <Card className={isExpired ? "border-red-500/50 bg-red-500/5" : ""}>
-      <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4">
-        <div className="flex items-center gap-4 min-w-0 flex-1">
-          <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden relative flex-shrink-0">
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden relative">
             {business.imageUrl ? (
               <img 
                 src={business.imageUrl} 
                 alt={business.name} 
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                    '<div class="w-full h-full flex items-center justify-center bg-muted"><Store class="w-6 h-6 text-muted-foreground" /></div>';
-                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -1820,31 +1329,25 @@ function BusinessCard({
               </div>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h3 className="font-bold truncate">{business.name}</h3>
-              {isExpired ? (
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold">{business.name}</h3>
+              {isExpired && (
                 <Badge variant="destructive" className="text-xs">
                   {subInfo.status === 'trial_expired' ? 'تجريبي منتهي' : 'منتهي'}
                 </Badge>
-              ) : business.isVerified && (
-                <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded">موثق</span>
-              )}
-              {business.subscriptionTier === 'vip' && (
-                <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-500 rounded flex items-center gap-1">
-                  <Crown className="w-3 h-3" /> VIP
-                </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground truncate">
-              {business.category?.name || "بدون قسم"}
-            </p>
+            <p className="text-sm text-muted-foreground">{business.category?.name}</p>
+            {business.isVerified && !isExpired && (
+              <span className="text-xs text-primary">موثق</span>
+            )}
             {isExpired && (
-              <p className="text-xs text-red-500 mt-1">مخفي عن المستخدمين</p>
+              <p className="text-xs text-red-500">مخفي عن المستخدمين</p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+        <div className="flex items-center gap-2">
           <Dialog open={editingBusiness?.id === business.id} onOpenChange={(open) => !open && setEditingBusiness(null)}>
             <DialogTrigger asChild>
               <Button 
@@ -1856,7 +1359,7 @@ function BusinessCard({
                 <Pencil className="w-4 h-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>تعديل المحل</DialogTitle>
               </DialogHeader>
@@ -2013,61 +1516,44 @@ function BusinessForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     const filteredGallery = galleryImages.filter(url => url.trim() !== "");
-    const formData = { 
-      name: name.trim(),
-      nameEn: nameEn.trim() || null,
+    onSubmit({ 
+      name, 
+      nameEn: nameEn || null,
       categoryId: parseInt(categoryId), 
-      description: description.trim() || null,
-      address: address.trim() || null,
-      phone: phone.trim() || null,
-      whatsapp: whatsapp.trim() || null,
-      imageUrl: imageUrl.trim() || null,
-      storefrontImageUrl: storefrontImageUrl.trim() || null,
+      description: description || null,
+      address: address || null,
+      phone: phone || null,
+      whatsapp: whatsapp || null,
+      imageUrl: imageUrl || null,
+      storefrontImageUrl: storefrontImageUrl || null,
       galleryImages: filteredGallery.length > 0 ? filteredGallery : null,
       isVerified: subscriptionTier === 'vip' ? true : isVerified,
       latitude: latitude ? parseFloat(latitude) : null,
       longitude: longitude ? parseFloat(longitude) : null,
       workingHoursJson: JSON.stringify(workingHours),
-      instagram: instagram.trim() || null,
-      facebook: facebook.trim() || null,
-      tiktok: tiktok.trim() || null,
+      instagram: instagram || null,
+      facebook: facebook || null,
+      tiktok: tiktok || null,
       joinDate: joinDate ? new Date(joinDate) : new Date(),
       subscriptionActivatedAt: subscriptionActivatedAt ? new Date(subscriptionActivatedAt) : null,
       subscriptionTier,
-    };
-    
-    onSubmit(formData);
+    } as any);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">الاسم بالعربية *</label>
-          <Input 
-            value={name} 
-            onChange={(e) => setName(e.target.value)} 
-            required 
-            data-testid="input-business-name" 
-            placeholder="اسم المحل"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">الاسم بالإنجليزية</label>
-          <Input 
-            value={nameEn} 
-            onChange={(e) => setNameEn(e.target.value)} 
-            data-testid="input-business-name-en" 
-            placeholder="Business Name"
-          />
-        </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">الاسم بالعربية *</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} required data-testid="input-business-name" />
       </div>
-
+      <div className="space-y-2">
+        <label className="text-sm font-medium">الاسم بالإنجليزية</label>
+        <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} data-testid="input-business-name-en" />
+      </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">القسم *</label>
-        <Select value={categoryId} onValueChange={setCategoryId} required>
+        <Select value={categoryId} onValueChange={setCategoryId}>
           <SelectTrigger data-testid="select-business-category">
             <SelectValue placeholder="اختر القسم" />
           </SelectTrigger>
@@ -2080,46 +1566,22 @@ function BusinessForm({
           </SelectContent>
         </Select>
       </div>
-
       <div className="space-y-2">
         <label className="text-sm font-medium">الوصف</label>
-        <Textarea 
-          value={description} 
-          onChange={(e) => setDescription(e.target.value)} 
-          data-testid="input-business-description" 
-          placeholder="وصف مختصر عن المحل..."
-          rows={3}
-        />
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} data-testid="input-business-description" />
       </div>
-
       <div className="space-y-2">
         <label className="text-sm font-medium">العنوان</label>
-        <Input 
-          value={address} 
-          onChange={(e) => setAddress(e.target.value)} 
-          data-testid="input-business-address" 
-          placeholder="العنوان الكامل للمحل"
-        />
+        <Input value={address} onChange={(e) => setAddress(e.target.value)} data-testid="input-business-address" />
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">الهاتف</label>
-          <Input 
-            value={phone} 
-            onChange={(e) => setPhone(e.target.value)} 
-            data-testid="input-business-phone" 
-            placeholder="07701234567"
-          />
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} data-testid="input-business-phone" />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">واتساب</label>
-          <Input 
-            value={whatsapp} 
-            onChange={(e) => setWhatsapp(e.target.value)} 
-            data-testid="input-business-whatsapp" 
-            placeholder="07701234567"
-          />
+          <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} data-testid="input-business-whatsapp" />
         </div>
       </div>
 
@@ -2159,40 +1621,13 @@ function BusinessForm({
           <ImageIcon className="w-4 h-4" />
           صورة الشعار
         </label>
-        <div className="flex gap-2">
-          <Input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://example.com/logo.jpg"
-            className="flex-1"
-            data-testid="input-business-image"
-          />
-          {imageUrl && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => window.open(imageUrl, '_blank')}
-              title="معاينة الصورة"
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-        {imageUrl && (
-          <div className="mt-2 w-24 h-24 bg-muted rounded-lg overflow-hidden">
-            <img 
-              src={imageUrl} 
-              alt="معاينة الشعار" 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                  '<div class="w-full h-full flex items-center justify-center bg-muted"><ImageIcon class="w-6 h-6 text-muted-foreground" /></div>';
-              }}
-            />
-          </div>
-        )}
+        <ImageUploadField
+          value={imageUrl}
+          onChange={setImageUrl}
+          placeholder="https://..."
+          testId="input-business-image"
+          previewClassName="w-24 h-24"
+        />
       </div>
 
       <div className="space-y-2">
@@ -2200,84 +1635,30 @@ function BusinessForm({
           <Store className="w-4 h-4" />
           صورة الواجهة
         </label>
-        <div className="flex gap-2">
-          <Input
-            value={storefrontImageUrl}
-            onChange={(e) => setStorefrontImageUrl(e.target.value)}
-            placeholder="https://example.com/storefront.jpg"
-            className="flex-1"
-            data-testid="input-business-storefront"
-          />
-          {storefrontImageUrl && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => window.open(storefrontImageUrl, '_blank')}
-              title="معاينة الصورة"
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-        {storefrontImageUrl && (
-          <div className="mt-2 w-full h-40 bg-muted rounded-lg overflow-hidden">
-            <img 
-              src={storefrontImageUrl} 
-              alt="معاينة الواجهة" 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                  '<div class="w-full h-full flex items-center justify-center bg-muted"><Store class="w-8 h-8 text-muted-foreground" /></div>';
-              }}
-            />
-          </div>
-        )}
+        <ImageUploadField
+          value={storefrontImageUrl}
+          onChange={setStorefrontImageUrl}
+          placeholder="https://..."
+          testId="input-business-storefront"
+          previewClassName="w-full h-40"
+        />
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium flex items-center gap-2">
           <Images className="w-4 h-4" />
-          صور المحل
+          صور المحل (4 صور على الأقل)
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {galleryImages.map((url, index) => (
-            <div key={index} className="space-y-1">
-              <div className="flex gap-2">
-                <Input
-                  value={url}
-                  onChange={(e) => handleGalleryImageChange(index, e.target.value)}
-                  placeholder={`صورة ${index + 1}`}
-                  className="flex-1"
-                  data-testid={`input-gallery-image-${index}`}
-                />
-                {url && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => window.open(url, '_blank')}
-                    title="معاينة الصورة"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              {url && (
-                <div className="w-full h-24 bg-muted rounded-lg overflow-hidden">
-                  <img 
-                    src={url} 
-                    alt={`صورة المحل ${index + 1}`} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                      (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                        `<div class="w-full h-full flex items-center justify-center bg-muted"><Images class="w-6 h-6 text-muted-foreground" /></div>`;
-                    }}
-                  />
-                </div>
-              )}
+            <div key={index}>
+              <ImageUploadField
+                value={url}
+                onChange={(newUrl) => handleGalleryImageChange(index, newUrl)}
+                placeholder={`صورة ${index + 1}`}
+                testId={`input-gallery-image-${index}`}
+                previewClassName="w-full h-24"
+              />
             </div>
           ))}
         </div>
@@ -2371,7 +1752,7 @@ function BusinessForm({
         {showHours && (
           <div className="mt-2 space-y-3 p-3 bg-muted/50 rounded-lg border border-border">
             {(Object.keys(dayNames) as Array<keyof WorkingHours>).map((day) => (
-              <div key={day} className="flex flex-wrap items-center gap-2">
+              <div key={day} className="flex items-center gap-2 flex-wrap">
                 <div className="w-20 text-sm font-medium">{dayNames[day]}</div>
                 <input
                   type="checkbox"
@@ -2414,7 +1795,7 @@ function BusinessForm({
           إدارة الاشتراك
         </h4>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">تاريخ الانضمام</label>
             <Input 
@@ -2471,19 +1852,8 @@ function BusinessForm({
           {subscriptionTier === 'vip' && <span className="text-xs text-muted-foreground mr-2">(تلقائي مع VIP)</span>}
         </label>
       </div>
-      
-      <Button 
-        type="submit" 
-        className="w-full" 
-        disabled={isLoading || !name.trim() || !categoryId} 
-        data-testid="button-submit-business"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin ml-2" />
-            جاري {business ? "التحديث" : "الإضافة"}...
-          </>
-        ) : business ? "تحديث" : "إضافة"}
+      <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-submit-business">
+        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : business ? "تحديث" : "إضافة"}
       </Button>
     </form>
   );
@@ -2501,22 +1871,11 @@ function SubscriptionsTab() {
   const queryClient = useQueryClient();
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
-  const { data: businesses, isLoading, error } = useQuery<BusinessResponse[]>({
+  const { data: businesses, isLoading } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/businesses", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          console.warn("فشل تحميل المحلات، استخدام بيانات تجريبية");
-          return [];
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("خطأ في تحميل المحلات:", error);
-        throw error;
-      }
+      const res = await fetch("/api/admin/businesses");
+      return res.json();
     },
   });
 
@@ -2558,7 +1917,7 @@ function SubscriptionsTab() {
       case 'expiring': filtered = expiringBusinesses; break;
       default: filtered = businessesWithSubscription;
     }
-    return filtered.sort((a, b) => (a.subscriptionInfo.daysRemaining || 0) - (b.subscriptionInfo.daysRemaining || 0));
+    return filtered.sort((a, b) => a.subscriptionInfo.daysRemaining - b.subscriptionInfo.daysRemaining);
   };
 
   const updateMutation = useMutation({
@@ -2568,10 +1927,7 @@ function SubscriptionsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -2579,11 +1935,7 @@ function SubscriptionsTab() {
       toast({ title: "تم تحديث الاشتراك بنجاح" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في التحديث", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2619,8 +1971,7 @@ function SubscriptionsTab() {
 
   const getProgressValue = (daysRemaining: number, tier: string) => {
     const totalDays = tier === 'trial' ? 60 : 30;
-    if (daysRemaining <= 0) return 0;
-    return Math.min(100, (daysRemaining / totalDays) * 100);
+    return Math.max(0, Math.min(100, (daysRemaining / totalDays) * 100));
   };
 
   const getProgressColor = (daysRemaining: number) => {
@@ -2631,21 +1982,8 @@ function SubscriptionsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
+      <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل الاشتراكات...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل الاشتراكات</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] })}>
-          إعادة المحاولة
-        </Button>
       </div>
     );
   }
@@ -2658,7 +1996,7 @@ function SubscriptionsTab() {
       
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card 
-          className={`cursor-pointer transition-all hover:scale-[1.02] ${selectedFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
+          className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
           onClick={() => setSelectedFilter('all')}
           data-testid="filter-all"
         >
@@ -2676,7 +2014,7 @@ function SubscriptionsTab() {
         </Card>
         
         <Card 
-          className={`cursor-pointer transition-all hover:scale-[1.02] ${selectedFilter === 'active' ? 'ring-2 ring-green-500' : ''}`}
+          className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'active' ? 'ring-2 ring-green-500' : ''}`}
           onClick={() => setSelectedFilter('active')}
           data-testid="filter-active"
         >
@@ -2694,7 +2032,7 @@ function SubscriptionsTab() {
         </Card>
         
         <Card 
-          className={`cursor-pointer transition-all hover:scale-[1.02] ${selectedFilter === 'expired' ? 'ring-2 ring-red-500' : ''}`}
+          className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'expired' ? 'ring-2 ring-red-500' : ''}`}
           onClick={() => setSelectedFilter('expired')}
           data-testid="filter-expired"
         >
@@ -2712,7 +2050,7 @@ function SubscriptionsTab() {
         </Card>
         
         <Card 
-          className={`cursor-pointer transition-all hover:scale-[1.02] ${selectedFilter === 'vip' ? 'ring-2 ring-primary' : ''}`}
+          className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'vip' ? 'ring-2 ring-primary' : ''}`}
           onClick={() => setSelectedFilter('vip')}
           data-testid="filter-vip"
         >
@@ -2743,12 +2081,12 @@ function SubscriptionsTab() {
               {expiringBusinesses.map(b => (
                 <div 
                   key={b.id} 
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 cursor-pointer hover:scale-[1.02] transition-transform"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 cursor-pointer hover-elevate"
                   onClick={() => setSelectedFilter('expiring')}
                   data-testid={`alert-expiring-${b.id}`}
                 >
-                  <span className="font-medium text-sm truncate max-w-[150px]">{b.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 whitespace-nowrap">
+                  <span className="font-medium">{b.name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">
                     {b.subscriptionInfo.daysRemaining} يوم
                   </span>
                 </div>
@@ -2758,7 +2096,7 @@ function SubscriptionsTab() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 gap-4">
         <Card className="border-muted">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -2804,7 +2142,7 @@ function SubscriptionsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <CardTitle className="flex items-center justify-between gap-2 flex-wrap">
             <span>
               {selectedFilter === 'all' ? 'جميع المحلات' : 
                selectedFilter === 'active' ? 'المحلات النشطة' :
@@ -2819,43 +2157,29 @@ function SubscriptionsTab() {
         </CardHeader>
         <CardContent>
           {filteredBusinesses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <CreditCard className="w-12 h-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">لا توجد محلات في هذا التصنيف</p>
-            </div>
+            <p className="text-center text-muted-foreground py-8">لا توجد محلات في هذا التصنيف</p>
           ) : (
             <div className="space-y-3">
               {filteredBusinesses.map((business) => (
                 <div 
                   key={business.id} 
-                  className="p-4 rounded-lg border border-border bg-card/50 hover:bg-card/70 transition-colors"
+                  className="p-4 rounded-lg border border-border bg-card/50"
                   data-testid={`subscription-item-${business.id}`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-3">
+                  <div className="flex items-start gap-3 mb-3">
                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                       {business.imageUrl ? (
-                        <img 
-                          src={business.imageUrl} 
-                          alt={business.name} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                              `<div class="w-full h-full flex items-center justify-center bg-primary/10">
-                                <span class="text-primary font-bold text-sm">${business.name.charAt(0)}</span>
-                              </div>`;
-                          }}
-                        />
+                        <img src={business.imageUrl} alt={business.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                          <span className="text-primary font-bold text-sm">{business.name.charAt(0)}</span>
+                        <div className="w-full h-full flex items-center justify-center text-primary font-bold text-sm">
+                          {business.name.charAt(0)}
                         </div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <h3 className="font-bold text-sm truncate">{business.name}</h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-sm">{business.name}</h3>
                         {business.isVerified && <span className="text-blue-500 text-xs">✓</span>}
                         {business.subscriptionInfo.tier === 'vip' && (
                           <Crown className="w-3 h-3 text-primary" />
@@ -2875,7 +2199,7 @@ function SubscriptionsTab() {
 
                     <div className="text-left flex-shrink-0">
                       <div className={`text-lg font-bold ${business.subscriptionInfo.daysRemaining <= 7 ? 'text-orange-400' : business.subscriptionInfo.daysRemaining <= 0 ? 'text-red-400' : 'text-foreground'}`}>
-                        {business.subscriptionInfo.daysRemaining !== null ? business.subscriptionInfo.daysRemaining : '∞'}
+                        {business.subscriptionInfo.daysRemaining}
                       </div>
                       <div className="text-[10px] text-muted-foreground">يوم</div>
                     </div>
@@ -2884,22 +2208,20 @@ function SubscriptionsTab() {
                   <div className="mb-3">
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div 
-                        className={`h-full rounded-full transition-all duration-300 ${getProgressColor(business.subscriptionInfo.daysRemaining || 0)}`}
-                        style={{ width: `${getProgressValue(business.subscriptionInfo.daysRemaining || 0, business.subscriptionInfo.tier)}%` }}
+                        className={`h-full rounded-full transition-all ${getProgressColor(business.subscriptionInfo.daysRemaining)}`}
+                        style={{ width: `${getProgressValue(business.subscriptionInfo.daysRemaining, business.subscriptionInfo.tier)}%` }}
                       />
                     </div>
                     <div className="flex justify-between mt-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        ينتهي: {getExpirationDate(business.subscriptionInfo.daysRemaining || 0)}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground">ينتهي: {getExpirationDate(business.subscriptionInfo.daysRemaining)}</span>
                     </div>
                   </div>
                     
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-xs gap-1 flex-1 min-w-[100px]"
+                      className="text-xs gap-1 flex-1"
                       onClick={() => handleRenew(business.id, 'regular')}
                       disabled={updateMutation.isPending}
                       data-testid={`button-renew-regular-${business.id}`}
@@ -2909,7 +2231,7 @@ function SubscriptionsTab() {
                     </Button>
                     <Button
                       size="sm"
-                      className="text-xs gap-1 flex-1 min-w-[100px]"
+                      className="text-xs gap-1 flex-1"
                       onClick={() => handleRenew(business.id, 'vip')}
                       disabled={updateMutation.isPending}
                       data-testid={`button-renew-vip-${business.id}`}
@@ -2920,7 +2242,7 @@ function SubscriptionsTab() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-xs flex-1 min-w-[100px]"
+                      className="text-xs"
                       onClick={() => handleResetTrial(business.id)}
                       disabled={updateMutation.isPending}
                       data-testid={`button-reset-trial-${business.id}`}
@@ -2960,48 +2282,27 @@ function OffersTab() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingOffer, setEditingOffer] = useState<OfferResponse | null>(null);
 
-  const { data: offers, isLoading, error } = useQuery<OfferResponse[]>({
+  const { data: offers, isLoading } = useQuery<OfferResponse[]>({
     queryKey: ["/api/admin/offers"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/offers", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/offers");
+      return res.json();
     },
   });
 
   const { data: businesses } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/businesses", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/businesses");
+      return res.json();
     },
   });
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/categories", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/categories");
+      return res.json();
     },
   });
 
@@ -3012,10 +2313,7 @@ function OffersTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -3025,11 +2323,7 @@ function OffersTab() {
       setIsAddOpen(false);
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الإضافة", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -3040,10 +2334,7 @@ function OffersTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -3053,11 +2344,7 @@ function OffersTab() {
       setEditingOffer(null);
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في التحديث", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -3066,10 +2353,7 @@ function OffersTab() {
       const res = await fetch(`/api/admin/offers/${id}`, {
         method: "DELETE",
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -3078,38 +2362,21 @@ function OffersTab() {
       toast({ title: "تم حذف العرض" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الحذف", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
+      <div className="flex justify-center py-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل العروض...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل العروض</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/offers"] })}>
-          إعادة المحاولة
-        </Button>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-display font-bold">العروض الخاصة</h2>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
@@ -3118,7 +2385,7 @@ function OffersTab() {
               إضافة عرض
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>إضافة عرض جديد</DialogTitle>
             </DialogHeader>
@@ -3133,7 +2400,7 @@ function OffersTab() {
       </div>
 
       <Dialog open={!!editingOffer} onOpenChange={(open) => !open && setEditingOffer(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>تعديل العرض</DialogTitle>
           </DialogHeader>
@@ -3149,44 +2416,39 @@ function OffersTab() {
         </DialogContent>
       </Dialog>
 
-      {offers?.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Tag className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">لا توجد عروض حالياً</p>
-            <Button onClick={() => setIsAddOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              إضافة أول عرض
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {offers?.map((offer) => (
+      <div className="grid gap-4">
+        {offers?.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              لا توجد عروض حالياً
+            </CardContent>
+          </Card>
+        ) : (
+          offers?.map((offer) => (
             <Card key={offer.id} className={`${!offer.isActive ? 'opacity-60' : ''}`}>
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3 className="font-bold truncate">{offer.title}</h3>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-bold">{offer.title}</h3>
                     {!offer.isActive && (
-                      <span className="text-xs px-2 py-0.5 bg-muted rounded whitespace-nowrap">غير نشط</span>
+                      <span className="text-xs px-2 py-0.5 bg-muted rounded">غير نشط</span>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{offer.description}</p>
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1 whitespace-nowrap">
+                  <p className="text-sm text-muted-foreground">{offer.description}</p>
+                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
                       <Store className="w-3 h-3" />
-                      <span className="truncate max-w-[150px]">{offer.business?.name || "محل غير محدد"}</span>
+                      {offer.business?.name || "محل غير محدد"}
                     </span>
                     {offer.validUntil && (
-                      <span className="flex items-center gap-1 whitespace-nowrap">
+                      <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         صالح حتى: {new Date(offer.validUntil).toLocaleDateString("ar")}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -3197,12 +2459,7 @@ function OffersTab() {
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-destructive hover:text-destructive"
-                        data-testid={`button-delete-offer-${offer.id}`}
-                      >
+                      <Button variant="ghost" size="icon" className="text-destructive" data-testid={`button-delete-offer-${offer.id}`}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </AlertDialogTrigger>
@@ -3218,13 +2475,8 @@ function OffersTab() {
                         <AlertDialogAction
                           onClick={() => deleteMutation.mutate(offer.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          disabled={deleteMutation.isPending}
                         >
-                          {deleteMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            "حذف"
-                          )}
+                          حذف
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -3232,9 +2484,9 @@ function OffersTab() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -3267,20 +2519,15 @@ function OfferForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!businessId || !title.trim()) {
-      return;
-    }
-    
-    const formData = {
-      title: title.trim(),
-      description: description.trim() || null,
-      imageUrl: imageUrl.trim() || null,
+    if (!businessId) return;
+    onSubmit({
+      title,
+      description: description || null,
+      imageUrl: imageUrl || null,
       businessId: parseInt(businessId),
       validUntil: validUntil ? new Date(validUntil) : null,
       isActive,
-    };
-    
-    onSubmit(formData);
+    });
   };
 
   return (
@@ -3332,45 +2579,17 @@ function OfferForm({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="تفاصيل إضافية عن العرض..."
           data-testid="input-offer-description"
-          rows={3}
         />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">صورة العرض</label>
-        <div className="flex gap-2">
-          <Input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="رابط صورة العرض (اختياري)"
-            className="flex-1"
-            data-testid="input-offer-image"
-          />
-          {imageUrl && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => window.open(imageUrl, '_blank')}
-              title="معاينة الصورة"
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-        {imageUrl && (
-          <div className="mt-2 w-full h-32 bg-muted rounded-lg overflow-hidden">
-            <img 
-              src={imageUrl} 
-              alt="معاينة صورة العرض" 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.innerHTML = 
-                  '<div class="w-full h-full flex items-center justify-center bg-muted"><ImageIcon class="w-8 h-8 text-muted-foreground" /></div>';
-              }}
-            />
-          </div>
-        )}
+        <ImageUploadField
+          value={imageUrl}
+          onChange={setImageUrl}
+          placeholder="رابط صورة العرض (اختياري)"
+          testId="input-offer-image"
+          previewClassName="w-full h-32"
+        />
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">صالح حتى</label>
@@ -3392,18 +2611,8 @@ function OfferForm({
         />
         <label htmlFor="offerIsActive" className="text-sm font-medium">عرض نشط</label>
       </div>
-      <Button 
-        type="submit" 
-        className="w-full" 
-        disabled={isLoading || !businessId || !title.trim()} 
-        data-testid="button-submit-offer"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin ml-2" />
-            جاري {offer ? "التحديث" : "الإضافة"}...
-          </>
-        ) : offer ? "تحديث" : "إضافة"}
+      <Button type="submit" className="w-full" disabled={isLoading || !businessId || !title} data-testid="button-submit-offer">
+        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : offer ? "تحديث" : "إضافة"}
       </Button>
     </form>
   );
@@ -3427,60 +2636,34 @@ function ReviewsTab() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState<number | null>(null);
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
+  const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/categories", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/categories");
+      return res.json();
     },
   });
 
-  const { data: allBusinesses, isLoading: businessesLoading } = useQuery<BusinessResponse[]>({
+  const { data: allBusinesses } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/businesses", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/businesses");
+      return res.json();
     },
   });
 
-  const { data: reviews, isLoading: reviewsLoading, error } = useQuery<ReviewWithBusiness[]>({
+  const { data: reviews, isLoading } = useQuery<ReviewWithBusiness[]>({
     queryKey: ["/api/admin/reviews"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/reviews", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/admin/reviews");
+      return res.json();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/reviews/${id}`, { 
-        method: "DELETE" 
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      const res = await fetch(`/api/admin/reviews/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
@@ -3488,11 +2671,7 @@ function ReviewsTab() {
       toast({ title: "تم حذف التقييم" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الحذف", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -3521,25 +2700,10 @@ function ReviewsTab() {
     setSelectedBusinessId(bizId);
   };
 
-  const isLoading = categoriesLoading || businessesLoading || reviewsLoading;
-
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
+      <div className="flex justify-center py-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل المراجعات...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل المراجعات</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/reviews"] })}>
-          إعادة المحاولة
-        </Button>
       </div>
     );
   }
@@ -3550,8 +2714,6 @@ function ReviewsTab() {
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
     });
   };
 
@@ -3567,7 +2729,7 @@ function ReviewsTab() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">اختر القسم أولاً</label>
               <Select value={selectedCategoryId?.toString() || "all"} onValueChange={handleCategoryChange}>
@@ -3610,24 +2772,14 @@ function ReviewsTab() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5" />
             المراجعات ({filteredReviews.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredReviews.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <MessageCircle className="w-12 h-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
-                {selectedCategoryId || selectedBusinessId 
-                  ? "لا توجد مراجعات للمحل أو القسم المحدد"
-                  : "لا توجد مراجعات حتى الآن"
-                }
-              </p>
-            </div>
-          ) : (
+          {filteredReviews.length > 0 ? (
             <div className="space-y-4">
               {filteredReviews.map((review) => (
                 <div 
@@ -3635,9 +2787,9 @@ function ReviewsTab() {
                   className="p-4 bg-muted/50 rounded-lg border border-border/50"
                   data-testid={`review-item-${review.id}`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="font-bold">{review.visitorName}</span>
                         <div className="flex items-center gap-0.5 text-primary">
                           {[...Array(5)].map((_, i) => (
@@ -3647,19 +2799,16 @@ function ReviewsTab() {
                             />
                           ))}
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        <span className="text-xs text-muted-foreground">
                           {formatDate(review.createdAt)}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs ml-2 whitespace-nowrap">
-                          {review.categoryName}
-                        </span>
-                        <span className="mr-2">على:</span>
-                        <span className="font-medium text-foreground">{review.businessName}</span>
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs ml-2">{review.categoryName}</span>
+                        على: <span className="font-medium text-foreground">{review.businessName}</span>
                       </p>
                       {review.comment && (
-                        <p className="text-sm bg-background/50 p-3 rounded border">{review.comment}</p>
+                        <p className="text-sm">{review.comment}</p>
                       )}
                     </div>
                     <AlertDialog>
@@ -3667,7 +2816,7 @@ function ReviewsTab() {
                         <Button 
                           size="icon" 
                           variant="ghost" 
-                          className="text-destructive hover:text-destructive flex-shrink-0 self-end sm:self-auto"
+                          className="text-destructive hover:text-destructive"
                           data-testid={`button-delete-review-${review.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -3685,13 +2834,8 @@ function ReviewsTab() {
                           <AlertDialogAction
                             onClick={() => deleteMutation.mutate(review.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deleteMutation.isPending}
                           >
-                            {deleteMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              "حذف"
-                            )}
+                            حذف
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -3700,6 +2844,13 @@ function ReviewsTab() {
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              {selectedCategoryId || selectedBusinessId 
+                ? "لا توجد مراجعات للمحل أو القسم المحدد"
+                : "لا توجد مراجعات حتى الآن"
+              }
+            </p>
           )}
         </CardContent>
       </Card>
@@ -3711,31 +2862,16 @@ function SettingsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: settings, isLoading, error } = useQuery<Record<string, string>>({
+  const { data: settings, isLoading } = useQuery<Record<string, string>>({
     queryKey: ["/api/admin/settings"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/admin/settings", {
-          headers: { "Cache-Control": "no-cache" }
-        });
-        if (!res.ok) {
-          return {
-            primaryColor: "#d4a017",
-            backgroundColor: "#1a1a1a"
-          };
-        }
-        return await res.json();
-      } catch {
-        return {
-          primaryColor: "#d4a017",
-          backgroundColor: "#1a1a1a"
-        };
-      }
+      const res = await fetch("/api/admin/settings");
+      return res.json();
     },
   });
 
-  const [primaryColor, setPrimaryColor] = useState("#d4a017");
-  const [backgroundColor, setBackgroundColor] = useState("#1a1a1a");
+  const [primaryColor, setPrimaryColor] = useState(settings?.primaryColor || "#d4a017");
+  const [backgroundColor, setBackgroundColor] = useState(settings?.backgroundColor || "#1a1a1a");
 
   useEffect(() => {
     if (settings) {
@@ -3751,26 +2887,16 @@ function SettingsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `خطأ ${res.status}`);
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      toast({ 
-        title: "تم حفظ الإعدادات",
-        description: "سيتم تطبيق التغييرات بعد تحديث الصفحة"
-      });
+      toast({ title: "تم حفظ الإعدادات" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "خطأ في الحفظ", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "خطأ", description: error.message, variant: "destructive" });
     },
   });
 
@@ -3778,28 +2904,10 @@ function SettingsTab() {
     updateMutation.mutate({ primaryColor, backgroundColor });
   };
 
-  const handleReset = () => {
-    setPrimaryColor("#d4a017");
-    setBackgroundColor("#1a1a1a");
-  };
-
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
+      <div className="flex justify-center py-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل الإعدادات...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <AlertTriangle className="w-12 h-12 text-destructive" />
-        <p className="text-destructive">فشل تحميل الإعدادات</p>
-        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] })}>
-          إعادة المحاولة
-        </Button>
       </div>
     );
   }
@@ -3816,17 +2924,14 @@ function SettingsTab() {
                 type="color" 
                 value={primaryColor} 
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className="w-12 h-12 rounded cursor-pointer border border-border"
+                className="w-12 h-12 rounded cursor-pointer"
                 data-testid="input-primary-color"
               />
-              <div className="flex-1 space-y-1">
-                <Input 
-                  value={primaryColor} 
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">اللون الرئيسي للوحة التحكم والأزرار</p>
-              </div>
+              <Input 
+                value={primaryColor} 
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="flex-1"
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -3836,57 +2941,19 @@ function SettingsTab() {
                 type="color" 
                 value={backgroundColor} 
                 onChange={(e) => setBackgroundColor(e.target.value)}
-                className="w-12 h-12 rounded cursor-pointer border border-border"
+                className="w-12 h-12 rounded cursor-pointer"
                 data-testid="input-background-color"
               />
-              <div className="flex-1 space-y-1">
-                <Input 
-                  value={backgroundColor} 
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">لون خلفية لوحة التحكم</p>
-              </div>
+              <Input 
+                value={backgroundColor} 
+                onChange={(e) => setBackgroundColor(e.target.value)}
+                className="flex-1"
+              />
             </div>
           </div>
-          
-          <div className="p-4 bg-muted/50 rounded-lg border border-border">
-            <h4 className="font-medium mb-2">معاينة</h4>
-            <div 
-              className="h-32 rounded-lg border border-border p-4 flex items-center justify-center"
-              style={{ backgroundColor }}
-            >
-              <div 
-                className="px-4 py-2 rounded-lg font-medium"
-                style={{ backgroundColor: primaryColor, color: '#ffffff' }}
-              >
-                زر تجريبي
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button 
-              onClick={handleSave} 
-              disabled={updateMutation.isPending} 
-              data-testid="button-save-settings"
-              className="flex-1"
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  جاري الحفظ...
-                </>
-              ) : "حفظ الإعدادات"}
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleReset}
-              className="flex-1"
-            >
-              إعادة الضبط
-            </Button>
-          </div>
+          <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-settings">
+            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ الإعدادات"}
+          </Button>
         </CardContent>
       </Card>
     </div>
