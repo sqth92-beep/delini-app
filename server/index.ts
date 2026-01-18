@@ -1,5 +1,4 @@
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
@@ -7,42 +6,28 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
-app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Updated CORS for JWT & APK
 const corsOptions = {
   origin: [
-    "https://delini-app.onrender.com", // Web URL
-    "capacitor://localhost",           // Android APK
+    "https://delini-app.onrender.com", 
+    "capacitor://localhost",
     "http://localhost",
     "http://localhost:5173"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Accept"]
+  // Added Authorization to allowed headers for JWT
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"]
 };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-const sessionSecret = process.env.SESSION_SECRET || "default_secret_for_build";
-
-app.use(
-  session({
-    secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      sameSite: "none", // Allows APK & cross-origin cookies
-      secure: true,     // Required for sameSite: 'none'
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-    },
-  })
-);
-
 (async () => {
+  // registerRoutes will now be modified in the next step to support JWT
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -51,11 +36,11 @@ app.use(
     res.status(status).json({ message });
   });
 
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen({
+  const port = process.env.PORT || 5000;
+  server.listen({
     port,
     host: "0.0.0.0",
   }, () => {
-    console.log(`Server started on port ${port}`);
+    console.log(`Server running on port ${port}`);
   });
 })();
