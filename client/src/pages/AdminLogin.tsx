@@ -7,6 +7,7 @@ import { Lock, User, Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import logoImg from "@assets/Delini_1768321622197.png";
+import { config } from "@/lib/config";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
@@ -21,18 +22,18 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/admin/login", {
+      const loginUrl = config.getFullUrl("/api/admin/login");
+      
+      const res = await fetch(loginUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
       const data = await res.json();
-      // Check for token in any possible format (Gemini + GPT extra safety)
       const token = data.token || data.accessToken || data.jwt;
 
       if (res.ok && token) {
-        // Core fix for APK storage
         localStorage.setItem("admin_token", token);
         
         toast({ title: "Login Successful" });
@@ -44,10 +45,11 @@ export default function AdminLogin() {
           variant: "destructive" 
         });
       }
-    } catch {
+    } catch (error: any) {
+      console.error("Login error:", error);
       toast({ 
         title: "Connection Error", 
-        description: "Please check your server connection",
+        description: error.message || "Please check your server connection",
         variant: "destructive" 
       });
     } finally {
