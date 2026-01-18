@@ -7,7 +7,13 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     allowNavigation: [
-      'delini-backend.onrender.com'
+      'https://delini-backend.onrender.com',
+      'http://delini-backend.onrender.com',
+      'http://localhost',
+      'https://localhost',
+      'capacitor://localhost',
+      'http://192.168.*',
+      'http://10.0.*'
     ]
   },
   plugins: {
