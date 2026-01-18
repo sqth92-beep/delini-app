@@ -4,7 +4,6 @@ const BASE_URL = "https://delini-backend.onrender.com";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    alert(`Server Error: ${res.status}\n${text}`);
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -14,18 +13,18 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  
   try {
-    const res = await fetch(`${BASE_URL}${url}`, {
+    const res = await fetch(`${BASE_URL}${cleanUrl}`, {
       method,
       headers: data ? { "Content-Type": "application/json" } : {},
       body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
     });
 
     await throwIfResNotOk(res);
     return res;
   } catch (error: any) {
-    alert(`Request Failed: ${error.message}`);
     throw error;
   }
 }
@@ -36,10 +35,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const path = queryKey.join("/");
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    
     try {
-      const res = await fetch(`${BASE_URL}/${queryKey.join("/")}`, {
-        credentials: "include",
-      });
+      const res = await fetch(`${BASE_URL}${cleanPath}`);
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;
@@ -48,7 +48,7 @@ export const getQueryFn: <T>(options: {
       await throwIfResNotOk(res);
       return await res.json();
     } catch (error: any) {
-      alert(`Query Error (${queryKey[0]}): ${error.message}`);
+      alert(`Query Error (${queryKey.join("/")}): ${error.message}`);
       throw error;
     }
   };
@@ -59,7 +59,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 5000,
       retry: false,
     },
     mutations: {
