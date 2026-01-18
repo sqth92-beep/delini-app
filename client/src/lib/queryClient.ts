@@ -23,6 +23,7 @@ export async function apiRequest(
         "Accept": "application/json",
       },
       body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
     });
     await throwIfResNotOk(res);
     return res;
@@ -44,7 +45,8 @@ export const getQueryFn: <T>(options: {
         headers: {
           "Accept": "application/json",
           "Cache-Control": "no-cache",
-        }
+        },
+        credentials: "include",
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -63,8 +65,8 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       staleTime: 0,
-      refetchOnMount: true,
-      retry: 2,
+      refetchOnWindowFocus: true,
+      retry: 3,
     },
   },
 });
