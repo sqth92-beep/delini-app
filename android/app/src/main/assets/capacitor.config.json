@@ -1,5 +1,16 @@
 {
-	"appId": "com.delini.app",
-	"appName": "Delini",
-	"webDir": "dist/public"
+  "appId": "com.delini.app",
+  "appName": "Delini",
+  "webDir": "dist/public",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "delini-backend.onrender.com"
+    ]
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
 }
