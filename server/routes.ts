@@ -1,6 +1,4 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import type { Server } from "http";
-import { createServer } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { visitorCounter, adminUsers } from "@shared/schema";
@@ -11,28 +9,58 @@ import { z } from "zod";
 const JWT_SECRET = process.env.JWT_SECRET || "delini_secure_key_2026";
 const TOKEN_EXPIRY = "30d";
 
-// JWT Middleware
-function authenticateAdmin(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader?.split(' ')[1];
+const publicRoutes = [
+  "/api/visitors/count",
+  "/api/visitors/increment",
+  "/api/categories",
+  "/api/businesses",
+  "/api/offers",
+  "/api/offers/active",
+  "/api/businesses/:businessId/reviews",
+  "/api/admin/login"
+];
 
-  if (!token) return res.status(401).json({ message: "Access denied" });
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ message: "Invalid token" });
-    (req as any).admin = decoded;
-    next();
+function isPublicRoute(path: string): boolean {
+  return publicRoutes.some(route => {
+    const pattern = route.replace(/:[^/]+/g, '[^/]+');
+    const regex = new RegExp(`^${pattern}$`);
+    return regex.test(path);
   });
 }
 
-// Rate limiting for login attempts
+function authenticateAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
+  if (isPublicRoute(req.path)) {
+    return next();
+  }
+
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Access denied' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; username: string };
+    (req as any).admin = decoded;
+    next();
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired' });
+    }
+    return res.status(403).json({ message: 'Invalid token' });
+  }
+}
+
 const loginAttempts = new Map<string, { count: number; lockedUntil: number | null }>();
 const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes
+const LOCKOUT_DURATION = 5 * 60 * 1000;
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  
-  // ------------------- PUBLIC ROUTES -------------------
+export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/visitors/count", async (_req, res) => {
     try {
       const counter = await db.select().from(visitorCounter).limit(1);
@@ -83,7 +111,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(offers);
   });
 
-  // ------------------- ADMIN AUTH -------------------
   const adminLoginSchema = z.object({
     username: z.string(),
     password: z.string()
@@ -125,7 +152,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json((req as any).admin);
   });
 
-  // ------------------- ADMIN CATEGORIES -------------------
   app.get("/api/admin/categories", authenticateAdmin, async (_req, res) => {
     const categories = await storage.getCategories();
     res.json(categories);
@@ -155,7 +181,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // ------------------- ADMIN CITIES -------------------
   app.get("/api/admin/cities", authenticateAdmin, async (_req, res) => {
     const cities = await storage.getCities();
     res.json(cities);
@@ -173,7 +198,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // ------------------- ADMIN BUSINESSES -------------------
   app.get("/api/admin/businesses", authenticateAdmin, async (_req, res) => {
     const businesses = await storage.getBusinesses(undefined, undefined, undefined, undefined, true);
     res.json(businesses);
@@ -198,7 +222,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // ------------------- ADMIN OFFERS -------------------
   app.get("/api/admin/offers", authenticateAdmin, async (_req, res) => {
     const offers = await storage.getOffers();
     res.json(offers);
@@ -223,7 +246,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // ------------------- ADMIN REVIEWS -------------------
   app.get("/api/businesses/:businessId/reviews", async (req, res) => {
     const reviews = await storage.getReviews(parseInt(req.params.businessId));
     res.json(reviews);
@@ -245,7 +267,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // ------------------- ADMIN SETTINGS -------------------
   app.get("/api/admin/settings", authenticateAdmin, async (_req, res) => {
     const settings = await storage.getAppSettings();
     res.json(settings);
@@ -259,7 +280,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
-  // ------------------- EXPORT -------------------
   app.get("/api/admin/export/businesses", authenticateAdmin, async (_req, res) => {
     const businesses = await storage.getBusinesses();
     const csvHeader = "ID,Name,Category,Address,Phone,Verified,Rating,Tier\n";
@@ -270,7 +290,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Disposition', 'attachment; filename=businesses.csv');
     res.send('\uFEFF' + csvHeader + csvRows);
   });
-
-  const httpServer = createServer(app);
-  return httpServer;
 }
