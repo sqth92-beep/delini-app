@@ -1,36 +1,34 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-
-const BASE_URL = "https://delini-backend.onrender.com";
+import { config } from "./config";
 
 async function throwIfResNotOk(res: Response, url: string) {
   if (!res.ok) {
     const text = await res.text();
-    alert(`DEBUG_LOG: Error at ${url}\nStatus: ${res.status}\nResponse: ${text.substring(0, 100)}`);
-    throw new Error(`${res.status}: ${text}`);
+    console.error(`API Error at ${url}:`, { status: res.status, text });
+    throw new Error(`${res.status}: ${text.substring(0, 100)}`);
   }
 }
 
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown,
 ): Promise<Response> {
-  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-  const fullUrl = `${BASE_URL}${cleanUrl}`;
+  const fullUrl = config.getFullUrl(url);
+  
   try {
+    const headers = config.getContentHeaders(method !== 'GET');
+    
     const res = await fetch(fullUrl, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-      },
+      headers,
       body: data ? JSON.stringify(data) : undefined,
     });
-    await throwIfResNotOk(res, cleanUrl);
+    
+    await throwIfResNotOk(res, url);
     return res;
   } catch (error: any) {
-    alert(`FETCH_EXCEPTION: ${error.message}`);
+    console.error(`Fetch exception for ${url}:`, error);
     throw error;
   }
 }
@@ -41,21 +39,19 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const path = queryKey.join("/");
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    const fullUrl = config.getFullUrl(path);
+    
     try {
-      const res = await fetch(`${BASE_URL}${cleanPath}`, {
+      const res = await fetch(fullUrl, {
         method: "GET",
-        headers: {
-          "Accept": "application/json",
-          "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
-        }
+        headers: config.getHeaders(false),
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;
       }
 
-      await throwIfResNotOk(res, cleanPath);
+      await throwIfResNotOk(res, path);
       return await res.json();
     } catch (error: any) {
       throw error;
@@ -67,7 +63,7 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       staleTime: 0,
-      retry: 0, 
+      retry: 0,
     },
   },
 });
