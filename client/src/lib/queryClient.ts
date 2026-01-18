@@ -14,14 +14,12 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-  
   try {
     const res = await fetch(`${BASE_URL}${cleanUrl}`, {
       method,
       headers: data ? { "Content-Type": "application/json" } : {},
       body: data ? JSON.stringify(data) : undefined,
     });
-
     await throwIfResNotOk(res);
     return res;
   } catch (error: any) {
@@ -37,14 +35,11 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const path = queryKey.join("/");
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    
     try {
       const res = await fetch(`${BASE_URL}${cleanPath}`);
-
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;
       }
-
       await throwIfResNotOk(res);
       return await res.json();
     } catch (error: any) {
