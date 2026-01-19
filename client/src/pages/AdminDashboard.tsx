@@ -71,6 +71,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { config } from "@/lib/config";
 
 type Tab = "dashboard" | "categories" | "cities" | "businesses" | "subscriptions" | "offers" | "reviews" | "settings";
 
@@ -84,7 +85,9 @@ export default function AdminDashboard() {
   const { data: adminData, isLoading: checkingAuth, error: authError } = useQuery({
     queryKey: ["/api/admin/me"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/me", { credentials: "include" });
+      const res = await fetch(config.getFullUrl("/api/admin/me"), {
+        headers: config.getHeaders(true),
+      });
       if (!res.ok) throw new Error("Not authenticated");
       return res.json();
     },
@@ -99,7 +102,10 @@ export default function AdminDashboard() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
+      await fetch(config.getFullUrl("/api/admin/logout"), {
+        method: "POST",
+        headers: config.getHeaders(true),
+      });
     },
     onSuccess: () => {
       setLocation("/admin/login");
@@ -312,14 +318,15 @@ interface ActivityLog {
   adminUsername: string;
   createdAt: string;
 }
-
 function DashboardTab() {
   const { toast } = useToast();
 
   const { data: stats, isLoading: statsLoading } = useQuery<Statistics>({
     queryKey: ["/api/admin/statistics"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/statistics");
+      const res = await fetch(config.getFullUrl("/api/admin/statistics"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -327,7 +334,9 @@ function DashboardTab() {
   const { data: activityLogs } = useQuery<ActivityLog[]>({
     queryKey: ["/api/admin/activity-logs"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/activity-logs?limit=10");
+      const res = await fetch(config.getFullUrl("/api/admin/activity-logs?limit=10"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -335,7 +344,9 @@ function DashboardTab() {
   const { data: businesses } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/businesses");
+      const res = await fetch(config.getFullUrl("/api/admin/businesses"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -348,7 +359,6 @@ function DashboardTab() {
     daysRemaining: getSubscriptionInfo(b.joinDate, b.subscriptionActivatedAt, b.subscriptionTier).daysRemaining
   })) || [];
 
-  // Expired subscriptions - hidden from public view
   const expiredSubscriptions = businesses?.filter(b => {
     const subInfo = getSubscriptionInfo(b.joinDate, b.subscriptionActivatedAt, b.subscriptionTier);
     return subInfo.status === 'expired' || subInfo.status === 'trial_expired';
@@ -359,7 +369,9 @@ function DashboardTab() {
 
   const handleExport = async (type: 'businesses' | 'subscriptions' | 'reviews') => {
     try {
-      const res = await fetch(`/api/admin/export/${type}`);
+      const res = await fetch(config.getFullUrl(`/api/admin/export/${type}`), {
+        headers: config.getHeaders(true),
+      });
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -531,10 +543,10 @@ function DashboardTab() {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-primary">
-            {(stats?.monthlyRevenue || 0).toLocaleString('en')} ر.س
+            د.ع {(stats?.monthlyRevenue || 0).toLocaleString('ar-IQ')}
           </div>
           <p className="text-xs text-muted-foreground">
-            VIP: 10,000 ر.س | عادي: 5,000 ر.س
+            VIP: 10,000 د.ع | عادي: 5,000 د.ع
           </p>
         </CardContent>
       </Card>
@@ -625,16 +637,18 @@ function CategoriesTab() {
   const { data: categories, isLoading } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/categories");
+      const res = await fetch(config.getFullUrl("/api/admin/categories"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Category>) => {
-      const res = await fetch("/api/admin/categories", {
+      const res = await fetch(config.getFullUrl("/api/admin/categories"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -651,11 +665,11 @@ function CategoriesTab() {
     },
   });
 
-  const updateMutation = useMutation({
+const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<Category> }) => {
-      const res = await fetch(`/api/admin/categories/${id}`, {
+      const res = await fetch(config.getFullUrl(`/api/admin/categories/${id}`), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -674,7 +688,10 @@ function CategoriesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
+      const res = await fetch(config.getFullUrl(`/api/admin/categories/${id}`), { 
+        method: "DELETE",
+        headers: config.getHeaders(true),
+      });
       if (!res.ok) throw new Error((await res.json()).message);
     },
     onSuccess: () => {
@@ -914,17 +931,18 @@ function CitiesTab() {
   const { data: cities, isLoading } = useQuery<City[]>({
     queryKey: ["/api/admin/cities"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/cities", { credentials: "include" });
+      const res = await fetch(config.getFullUrl("/api/admin/cities"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; nameEn: string; slug: string }) => {
-      const res = await fetch("/api/admin/cities", {
+      const res = await fetch(config.getFullUrl("/api/admin/cities"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -946,9 +964,9 @@ function CitiesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/cities/${id}`, { 
+      const res = await fetch(config.getFullUrl(`/api/admin/cities/${id}`), { 
         method: "DELETE",
-        credentials: "include"
+        headers: config.getHeaders(true),
       });
       if (!res.ok) throw new Error((await res.json()).message);
     },
@@ -974,8 +992,7 @@ function CitiesTab() {
       slug: newCitySlug.trim().toLowerCase().replace(/\s+/g, '-'),
     });
   };
-
-  return (
+return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-display font-bold">المدن</h2>
@@ -1104,7 +1121,9 @@ function BusinessesTab() {
   const { data: businesses, isLoading } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/businesses");
+      const res = await fetch(config.getFullUrl("/api/admin/businesses"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -1112,12 +1131,13 @@ function BusinessesTab() {
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/categories");
+      const res = await fetch(config.getFullUrl("/api/admin/categories"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
 
-  // Group businesses by category
   const businessesByCategory = (businesses || []).reduce((acc, business) => {
     const catId = business.categoryId?.toString() || "uncategorized";
     if (!acc[catId]) acc[catId] = [];
@@ -1125,16 +1145,15 @@ function BusinessesTab() {
     return acc;
   }, {} as Record<string, BusinessResponse[]>);
 
-  // Filter businesses based on selected category
   const filteredBusinesses = selectedCategoryFilter === "all" 
     ? businesses 
     : businesses?.filter(b => b.categoryId?.toString() === selectedCategoryFilter);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Business>) => {
-      const res = await fetch("/api/admin/businesses", {
+      const res = await fetch(config.getFullUrl("/api/admin/businesses"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -1153,9 +1172,9 @@ function BusinessesTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<Business> }) => {
-      const res = await fetch(`/api/admin/businesses/${id}`, {
+      const res = await fetch(config.getFullUrl(`/api/admin/businesses/${id}`), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -1174,7 +1193,10 @@ function BusinessesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/businesses/${id}`, { method: "DELETE" });
+      const res = await fetch(config.getFullUrl(`/api/admin/businesses/${id}`), { 
+        method: "DELETE",
+        headers: config.getHeaders(true),
+      });
       if (!res.ok) throw new Error((await res.json()).message);
     },
     onSuccess: () => {
@@ -1231,7 +1253,6 @@ function BusinessesTab() {
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : selectedCategoryFilter === "all" ? (
-        // Grouped view by category
         <div className="space-y-6">
           {categories?.map((category) => {
             const categoryBusinesses = businessesByCategory[category.id.toString()] || [];
@@ -1263,7 +1284,6 @@ function BusinessesTab() {
           })}
         </div>
       ) : (
-        // Filtered view - single category
         <div className="grid gap-4">
           {filteredBusinesses?.map((business) => (
             <BusinessCard 
@@ -1874,7 +1894,9 @@ function SubscriptionsTab() {
   const { data: businesses, isLoading } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/businesses");
+      const res = await fetch(config.getFullUrl("/api/admin/businesses"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -1908,7 +1930,7 @@ function SubscriptionsTab() {
     return total;
   }, 0);
 
-  const getFilteredBusinesses = () => {
+const getFilteredBusinesses = () => {
     let filtered: BusinessWithSubscription[] = [];
     switch(selectedFilter) {
       case 'active': filtered = activeBusinesses; break;
@@ -1922,9 +1944,9 @@ function SubscriptionsTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await fetch(`/api/admin/businesses/${id}`, {
+      const res = await fetch(config.getFullUrl(`/api/admin/businesses/${id}`), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -2285,7 +2307,9 @@ function OffersTab() {
   const { data: offers, isLoading } = useQuery<OfferResponse[]>({
     queryKey: ["/api/admin/offers"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/offers");
+      const res = await fetch(config.getFullUrl("/api/admin/offers"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -2293,24 +2317,28 @@ function OffersTab() {
   const { data: businesses } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/businesses");
+      const res = await fetch(config.getFullUrl("/api/admin/businesses"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
 
-  const { data: categories } = useQuery<Category[]>({
+const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/categories");
+      const res = await fetch(config.getFullUrl("/api/admin/categories"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch("/api/admin/offers", {
+      const res = await fetch(config.getFullUrl("/api/admin/offers"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -2329,9 +2357,9 @@ function OffersTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await fetch(`/api/admin/offers/${id}`, {
+      const res = await fetch(config.getFullUrl(`/api/admin/offers/${id}`), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -2350,8 +2378,9 @@ function OffersTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/offers/${id}`, {
+      const res = await fetch(config.getFullUrl(`/api/admin/offers/${id}`), {
         method: "DELETE",
+        headers: config.getHeaders(true),
       });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
@@ -2530,7 +2559,7 @@ function OfferForm({
     });
   };
 
-  return (
+ return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <label className="text-sm font-medium">القسم *</label>
@@ -2639,7 +2668,9 @@ function ReviewsTab() {
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/admin/categories"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/categories");
+      const res = await fetch(config.getFullUrl("/api/admin/categories"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -2647,7 +2678,9 @@ function ReviewsTab() {
   const { data: allBusinesses } = useQuery<BusinessResponse[]>({
     queryKey: ["/api/admin/businesses"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/businesses");
+      const res = await fetch(config.getFullUrl("/api/admin/businesses"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -2655,14 +2688,19 @@ function ReviewsTab() {
   const { data: reviews, isLoading } = useQuery<ReviewWithBusiness[]>({
     queryKey: ["/api/admin/reviews"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/reviews");
+      const res = await fetch(config.getFullUrl("/api/admin/reviews"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/reviews/${id}`, { method: "DELETE" });
+      const res = await fetch(config.getFullUrl(`/api/admin/reviews/${id}`), { 
+        method: "DELETE",
+        headers: config.getHeaders(true),
+      });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
@@ -2865,7 +2903,9 @@ function SettingsTab() {
   const { data: settings, isLoading } = useQuery<Record<string, string>>({
     queryKey: ["/api/admin/settings"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/settings");
+      const res = await fetch(config.getFullUrl("/api/admin/settings"), {
+        headers: config.getHeaders(true),
+      });
       return res.json();
     },
   });
@@ -2882,9 +2922,9 @@ function SettingsTab() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: Record<string, string>) => {
-      const res = await fetch("/api/admin/settings", {
+      const res = await fetch(config.getFullUrl("/api/admin/settings"), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: config.getContentHeaders(true),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error((await res.json()).message);
