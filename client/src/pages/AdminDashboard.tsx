@@ -34,7 +34,8 @@ import {
   Users,
   XCircle,
   MessageCircle,
-  Star
+  Star,
+  Sparkles // ⬅️ تم الإضافة
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -93,7 +94,6 @@ export default function AdminDashboard() {
     },
     retry: false,
   });
-
   useEffect(() => {
     if (authError) {
       setLocation("/admin/login");
@@ -1917,6 +1917,8 @@ function SubscriptionsTab() {
     b.subscriptionInfo.status === 'trial_expired' || b.subscriptionInfo.status === 'expired'
   );
   const vipBusinesses = businessesWithSubscription.filter(b => b.subscriptionInfo.tier === 'vip');
+  const normalBusinesses = businessesWithSubscription.filter(b => b.subscriptionInfo.tier === 'regular');
+  const trialBusinesses = businessesWithSubscription.filter(b => b.subscriptionInfo.tier === 'trial');
   
   const expiringBusinesses = businessesWithSubscription.filter(b => 
     (b.subscriptionInfo.status === 'trial' || b.subscriptionInfo.status === 'active') &&
@@ -1930,12 +1932,14 @@ function SubscriptionsTab() {
     return total;
   }, 0);
 
-const getFilteredBusinesses = () => {
+  const getFilteredBusinesses = () => {
     let filtered: BusinessWithSubscription[] = [];
     switch(selectedFilter) {
       case 'active': filtered = activeBusinesses; break;
       case 'expired': filtered = expiredBusinesses; break;
       case 'vip': filtered = vipBusinesses; break;
+      case 'regular': filtered = normalBusinesses; break;
+      case 'trial': filtered = trialBusinesses; break;
       case 'expiring': filtered = expiringBusinesses; break;
       default: filtered = businessesWithSubscription;
     }
@@ -2016,20 +2020,20 @@ const getFilteredBusinesses = () => {
     <div className="space-y-6">
       <h2 className="text-2xl font-display font-bold">إدارة الاشتراكات</h2>
       
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Card 
           className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
           onClick={() => setSelectedFilter('all')}
           data-testid="filter-all"
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-muted">
-                <Users className="w-5 h-5 text-muted-foreground" />
+                <Users className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">الكل</p>
-                <p className="text-2xl font-bold">{businessesWithSubscription.length}</p>
+                <p className="text-xs text-muted-foreground">الكل</p>
+                <p className="text-xl font-bold">{businessesWithSubscription.length}</p>
               </div>
             </div>
           </CardContent>
@@ -2040,14 +2044,14 @@ const getFilteredBusinesses = () => {
           onClick={() => setSelectedFilter('active')}
           data-testid="filter-active"
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-green-500/20">
-                <Clock className="w-5 h-5 text-green-500" />
+                <Clock className="w-4 h-4 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-green-400">نشط</p>
-                <p className="text-2xl font-bold text-green-400">{activeBusinesses.length}</p>
+                <p className="text-xs text-green-400">نشط</p>
+                <p className="text-xl font-bold text-green-400">{activeBusinesses.length}</p>
               </div>
             </div>
           </CardContent>
@@ -2058,14 +2062,32 @@ const getFilteredBusinesses = () => {
           onClick={() => setSelectedFilter('expired')}
           data-testid="filter-expired"
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-red-500/20">
-                <XCircle className="w-5 h-5 text-red-500" />
+                <XCircle className="w-4 h-4 text-red-500" />
               </div>
               <div>
-                <p className="text-sm text-red-400">منتهي</p>
-                <p className="text-2xl font-bold text-red-400">{expiredBusinesses.length}</p>
+                <p className="text-xs text-red-400">منتهي</p>
+                <p className="text-xl font-bold text-red-400">{expiredBusinesses.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'regular' ? 'ring-2 ring-blue-500' : ''}`}
+          onClick={() => setSelectedFilter('regular')}
+          data-testid="filter-regular"
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Store className="w-4 h-4 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-blue-400">عادي</p>
+                <p className="text-xl font-bold text-blue-400">{normalBusinesses.length}</p>
               </div>
             </div>
           </CardContent>
@@ -2076,14 +2098,32 @@ const getFilteredBusinesses = () => {
           onClick={() => setSelectedFilter('vip')}
           data-testid="filter-vip"
         >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-primary/20">
-                <Crown className="w-5 h-5 text-primary" />
+                <Crown className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-primary">مميز</p>
-                <p className="text-2xl font-bold text-primary">{vipBusinesses.length}</p>
+                <p className="text-xs text-primary">مميز</p>
+                <p className="text-xl font-bold text-primary">{vipBusinesses.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className={`cursor-pointer transition-all hover-elevate ${selectedFilter === 'trial' ? 'ring-2 ring-purple-500' : ''}`}
+          onClick={() => setSelectedFilter('trial')}
+          data-testid="filter-trial"
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-purple-500/20">
+                <Sparkles className="w-4 h-4 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-xs text-purple-400">تجريبي</p>
+                <p className="text-xl font-bold text-purple-400">{trialBusinesses.length}</p>
               </div>
             </div>
           </CardContent>
@@ -2170,7 +2210,9 @@ const getFilteredBusinesses = () => {
                selectedFilter === 'active' ? 'المحلات النشطة' :
                selectedFilter === 'expired' ? 'المحلات المنتهية' :
                selectedFilter === 'vip' ? 'المحلات المميزة' :
-               selectedFilter === 'expiring' ? 'ستنتهي قريباً' : 'جميع المحلات'}
+               selectedFilter === 'expiring' ? 'ستنتهي قريباً' :
+               selectedFilter === 'regular' ? 'المحلات العادية' :
+               selectedFilter === 'trial' ? 'المحلات التجريبية' : 'جميع المحلات'}
             </span>
             <span className="text-sm font-normal text-muted-foreground">
               ({filteredBusinesses.length} محل) - مرتبة حسب تاريخ الانتهاء
@@ -2281,7 +2323,6 @@ const getFilteredBusinesses = () => {
     </div>
   );
 }
-
 interface OfferResponse {
   id: number;
   businessId: number;
