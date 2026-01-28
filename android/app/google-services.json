@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "737613473320",
+    "project_id": "delini",
+    "storage_bucket": "delini.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:737613473320:android:6275f205e03a6ddec2371d",
+        "android_client_info": {
+          "package_name": "com.delini.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsLpgtg2ZarSUb4eGUdh7bjKc0yJXK0_4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
