@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +7,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 import { PreviewShell } from "@/components/PreviewShell";
 import NotFound from "@/pages/not-found";
+
+// استيراد OneSignal
+import OneSignal from 'onesignal-cordova-plugin';
 
 import Home from "@/pages/Home";
 import CategoryList from "@/pages/CategoryList";
@@ -49,7 +53,7 @@ function PreviewOffers() {
 }
 
 function PreviewFavorites() {
-  return <PreviewShell><Favorites /></PreviewShell>;
+  return <PreviewShell><PreviewFavorites /></PreviewShell>;
 }
 
 function Router() {
@@ -80,6 +84,20 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    // تشغيل ون سيجنال فور فتح التطبيق
+    try {
+      OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
+      
+      // طلب الإذن لإظهار الإشعارات (لحل مشكلة الأزرار الباهتة)
+      OneSignal.promptForPushNotificationsWithUserResponse((accepted) => {
+        console.log("User accepted notifications: ", accepted);
+      });
+    } catch (e) {
+      console.error("OneSignal error: ", e);
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
