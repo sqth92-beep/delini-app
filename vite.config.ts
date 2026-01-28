@@ -30,10 +30,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // هذا السطر يخبر Vite أن يتجاهل مكتبة الموبايل ولا يعتبرها خطأ بناء
+    rollupOptions: {
+      external: ['onesignal-cordova-plugin']
+    }
   },
   server: {
     fs: {
-      strict: true,
+      strict: false, // غيرناها لضمان عدم تقييد الوصول للملفات أثناء التطوير
       deny: ["**/.*"],
     },
   },
