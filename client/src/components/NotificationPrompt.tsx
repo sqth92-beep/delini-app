@@ -9,33 +9,42 @@ export function NotificationPrompt() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // إظهار التنبيه بعد 3 ثوانٍ إذا لم يسبق للمستخدم الموافقة
     const timer = setTimeout(() => {
       const alreadyAsked = localStorage.getItem('delini_notified_v1');
       if (!alreadyAsked) {
         setShowPrompt(true);
       }
     }, 3000);
-
     return () => clearTimeout(timer);
   }, []);
 
   const handleAllow = async () => {
     setIsLoading(true);
-    
     try {
-      // الوصول لمكتبة ون سيجنال بالطريقة الصحيحة لـ Capacitor الحديث
-      const OneSignal = (window as any).OneSignal;
+      // المحاولة الأولى: الوصول عبر plugins (الطريقة الأضمن في Cordova)
+      const OS = (window as any).plugins?.OneSignal || (window as any).OneSignal;
       
-      if (OneSignal && OneSignal.Notifications) {
-        // طلب الإذن الرسمي الذي سيفتح نافذة أندرويد
-        await OneSignal.Notifications.requestPermission(true);
+      if (OS) {
+        // فحص وجود الدالة قبل استدعائها لتجنب الانهيار
+        if (typeof OS.requestPermission === 'function') {
+          // في بعض النسخ تكون مباشرة
+          OS.requestPermission(true, (response: any) => {
+             console.log("Permission Response:", response);
+          });
+        } else if (OS.Notifications && typeof OS.Notifications.requestPermission === 'function') {
+          // في النسخ الأحدث تكون تحت Notifications
+          await OS.Notifications.requestPermission(true);
+        } else {
+          // إذا لم يجد الدالة، سيخبرنا ماذا وجد بدلاً منها
+          alert("OneSignal found but requestPermission is missing. Props: " + Object.keys(OS).join(', '));
+        }
         
-        // حفظ الحالة وإغلاق النافذة بعد الرد
         localStorage.setItem('delini_notified_v1', 'true');
         setShowPrompt(false);
       } else {
-        // الدخول هنا في حال المتصفح أو إذا لم تكن الإضافة محملة
+        // إذا لم يجد المكتبة أصلاً
+        alert("OneSignal Plugin NOT found on this device.");
+        
         if ('Notification' in window) {
           const permission = await Notification.requestPermission();
           if (permission === 'granted') {
@@ -44,9 +53,9 @@ export function NotificationPrompt() {
         }
         setShowPrompt(false);
       }
-    } catch (error) {
-      console.error("OneSignal Error:", error);
-      // إغلاق النافذة حتى في حال الخطأ لمنع تعليق الزر
+    } catch (error: any) {
+      // هذا التنبيه سيحسم الجدل ويخبرنا بالسبب الحقيقي للفشل
+      alert("Technical Error: " + (error.message || error));
       setShowPrompt(false);
     } finally {
       setIsLoading(false);
@@ -76,7 +85,7 @@ export function NotificationPrompt() {
                 <div className="flex-1 space-y-2">
                   <h4 className="font-semibold text-white">تفعيل الإشعارات</h4>
                   <p className="text-sm text-zinc-400">
-                    فعّل الإشعارات لتصلك أحدث العروض والمحلات الجديدة في DeLiNi
+                    فعّل الإشعارات لتصلك أحدث العروض في DeLiNi
                   </p>
                   <div className="flex gap-2 pt-1">
                     <Button
