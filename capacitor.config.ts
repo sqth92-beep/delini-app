@@ -22,6 +22,9 @@ const config: CapacitorConfig = {
     },
     CapacitorCookies: {
       enabled: true
+    },
+    OneSignal: {
+      appId: 'd4d5d6d7-eece-42c5-b891-94560d5ad7e3'
     }
   }
 };
