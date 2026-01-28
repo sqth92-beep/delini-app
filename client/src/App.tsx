@@ -8,9 +8,6 @@ import { I18nProvider } from "@/lib/i18n";
 import { PreviewShell } from "@/components/PreviewShell";
 import NotFound from "@/pages/not-found";
 
-// استيراد OneSignal
-import OneSignal from 'onesignal-cordova-plugin';
-
 import Home from "@/pages/Home";
 import CategoryList from "@/pages/CategoryList";
 import CategoryDetail from "@/pages/CategoryDetail";
@@ -53,7 +50,7 @@ function PreviewOffers() {
 }
 
 function PreviewFavorites() {
-  return <PreviewShell><PreviewFavorites /></PreviewShell>;
+  return <PreviewShell><Favorites /></PreviewShell>;
 }
 
 function Router() {
@@ -85,16 +82,15 @@ function Router() {
 
 function App() {
   useEffect(() => {
-    // تشغيل ون سيجنال فور فتح التطبيق
-    try {
-      OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
-      
-      // طلب الإذن لإظهار الإشعارات (لحل مشكلة الأزرار الباهتة)
-      OneSignal.promptForPushNotificationsWithUserResponse((accepted) => {
-        console.log("User accepted notifications: ", accepted);
-      });
-    } catch (e) {
-      console.error("OneSignal error: ", e);
+    // هذه الخطوة تمنع الخطأ في الويب لأنها تعمل فقط داخل الـ Capacitor (الموبايل)
+    if (window.hasOwnProperty('cordova')) {
+      import('onesignal-cordova-plugin').then((module) => {
+        const OneSignal = module.default;
+        OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
+        OneSignal.promptForPushNotificationsWithUserResponse((accepted) => {
+          console.log("User accepted notifications: ", accepted);
+        });
+      }).catch(err => console.error("OneSignal load error", err));
     }
   }, []);
 
