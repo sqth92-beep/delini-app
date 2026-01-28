@@ -2,45 +2,52 @@ import { useState, useEffect } from 'react';
 import { Bell, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useNotifications } from '@/hooks/use-notifications';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function NotificationPrompt() {
-  const { shouldAskPermission, requestPermission, checkAndShowNotification, permission } = useNotifications();
   const [showPrompt, setShowPrompt] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
-    }
-  }, []);
-
-  useEffect(() => {
+    // إظهار التنبيه بعد 3 ثوانٍ إذا لم يسبق للمستخدم الموافقة
     const timer = setTimeout(() => {
-      if (shouldAskPermission()) {
+      const alreadyAsked = localStorage.getItem('delini_notified_v1');
+      if (!alreadyAsked) {
         setShowPrompt(true);
       }
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [shouldAskPermission]);
-
-  useEffect(() => {
-    if (permission === 'granted') {
-      checkAndShowNotification();
-    }
-  }, [permission, checkAndShowNotification]);
+  }, []);
 
   const handleAllow = async () => {
     setIsLoading(true);
-    await requestPermission();
-    setIsLoading(false);
-    setShowPrompt(false);
+    
+    // طلب الإذن من نظام الأندرويد عبر ون سيجنال
+    const OS = (window as any).plugins?.OneSignal || (window as any).OneSignal;
+    
+    if (OS) {
+      OS.promptForPushNotificationsWithUserResponse((accepted: boolean) => {
+        console.log("User accepted notifications: ", accepted);
+        localStorage.setItem('delini_notified_v1', 'true');
+        setShowPrompt(false);
+        setIsLoading(false);
+      });
+    } else {
+      // إذا كان يعمل على متصفح عادي
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          localStorage.setItem('delini_notified_v1', 'true');
+        }
+      }
+      setShowPrompt(false);
+      setIsLoading(false);
+    }
   };
 
   const handleDismiss = () => {
-    localStorage.setItem('delini_notification_permission_asked', 'true');
+    localStorage.setItem('delini_notified_v1', 'true');
     setShowPrompt(false);
   };
 
@@ -62,7 +69,7 @@ export function NotificationPrompt() {
                 <div className="flex-1 space-y-2">
                   <h4 className="font-semibold text-white">تفعيل الإشعارات</h4>
                   <p className="text-sm text-zinc-400">
-                    فعّل الإشعارات لتصلك أحدث العروض والمحلات الجديدة
+                    فعّل الإشعارات لتصلك أحدث العروض والمحلات الجديدة في DeLiNi
                   </p>
                   <div className="flex gap-2 pt-1">
                     <Button
@@ -70,7 +77,6 @@ export function NotificationPrompt() {
                       onClick={handleAllow}
                       disabled={isLoading}
                       className="bg-amber-500 hover:bg-amber-600 text-black"
-                      data-testid="button-allow-notifications"
                     >
                       {isLoading ? 'جاري التفعيل...' : 'تفعيل'}
                     </Button>
@@ -79,7 +85,6 @@ export function NotificationPrompt() {
                       variant="ghost"
                       onClick={handleDismiss}
                       className="text-zinc-400 hover:text-white"
-                      data-testid="button-dismiss-notifications"
                     >
                       لاحقاً
                     </Button>
@@ -90,7 +95,6 @@ export function NotificationPrompt() {
                   variant="ghost"
                   onClick={handleDismiss}
                   className="h-6 w-6 shrink-0 text-zinc-500 hover:text-white"
-                  data-testid="button-close-notification-prompt"
                 >
                   <X className="h-4 w-4" />
                 </Button>
