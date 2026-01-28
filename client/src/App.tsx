@@ -44,31 +44,30 @@ function Router() {
 function App() {
   useEffect(() => {
     const initOneSignal = () => {
-      const OS = (window as any).plugins?.OneSignal || (window as any).OneSignal;
+      // الوصول للمكتبة
+      const OneSignal = (window as any).plugins?.OneSignal || (window as any).OneSignal;
       
-      if (OS) {
+      if (OneSignal) {
         try {
-          // ربط معرف التطبيق
-          OS.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
+          // الطريقة الصحيحة والحديثة للتعريف (Initialize)
+          // ملاحظة: d4d5d6d7 هو معرف تطبيقك الصحيح
+          OneSignal.initialize("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
           
-          // سحب حالة الجهاز والتأكد من التسجيل في السيرفر
-          OS.getDeviceState((state: any) => {
-            console.log("DeLiNi Device Registered:", state.isSubscribed);
-          });
-
-          // تفعيل استقبال الإشعارات والتطبيق مفتوح
-          OS.setNotificationWillShowInForegroundHandler((event: any) => {
-            event.complete(event.getNotification());
-          });
+          console.log("OneSignal Initialized for DeLiNi");
 
         } catch (e) {
-          console.error("OneSignal Init Error:", e);
+          console.error("OneSignal Error:", e);
         }
       }
     };
 
-    // انتظر حتى يكون النظام جاهزاً
-    document.addEventListener("deviceready", initOneSignal, false);
+    // التشغيل عند جاهزية الجهاز
+    if ((window as any).cordova) {
+        document.addEventListener("deviceready", initOneSignal, false);
+    } else {
+        // للمتصفح العادي (إختياري)
+        initOneSignal();
+    }
   }, []);
 
   return (
