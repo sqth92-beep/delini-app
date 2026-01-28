@@ -82,16 +82,23 @@ function Router() {
 
 function App() {
   useEffect(() => {
-    // هذه الخطوة تمنع الخطأ في الويب لأنها تعمل فقط داخل الـ Capacitor (الموبايل)
-    if (window.hasOwnProperty('cordova')) {
-      import('onesignal-cordova-plugin').then((module) => {
-        const OneSignal = module.default;
-        OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
-        OneSignal.promptForPushNotificationsWithUserResponse((accepted) => {
-          console.log("User accepted notifications: ", accepted);
-        });
-      }).catch(err => console.error("OneSignal load error", err));
-    }
+    // حل مشكلة Vite عبر استخدام استيراد نصي ديناميكي تماماً
+    const setupNotifications = async () => {
+      if (window.hasOwnProperty('cordova')) {
+        try {
+          // @ts-ignore
+          const OneSignal = (await import(/* @vite-ignore */ 'onesignal-cordova-plugin')).default;
+          OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
+          OneSignal.promptForPushNotificationsWithUserResponse((accepted: boolean) => {
+            console.log("User accepted notifications: ", accepted);
+          });
+        } catch (e) {
+          console.error("OneSignal error", e);
+        }
+      }
+    };
+    
+    setupNotifications();
   }, []);
 
   return (
