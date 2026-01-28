@@ -43,23 +43,32 @@ function Router() {
 
 function App() {
   useEffect(() => {
-    // تشغيل الإشعارات فقط إذا كان التطبيق يعمل على موبايل
-    const initOneSignal = async () => {
-      if (window.hasOwnProperty('cordova')) {
+    const initOneSignal = () => {
+      const OS = (window as any).plugins?.OneSignal || (window as any).OneSignal;
+      
+      if (OS) {
         try {
-          // @ts-ignore
-          const OneSignal = (await import('onesignal-cordova-plugin')).default;
-          OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
-          OneSignal.promptForPushNotificationsWithUserResponse((accepted: boolean) => {
-            console.log("User accepted notifications: ", accepted);
+          // ربط معرف التطبيق
+          OS.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
+          
+          // سحب حالة الجهاز والتأكد من التسجيل في السيرفر
+          OS.getDeviceState((state: any) => {
+            console.log("DeLiNi Device Registered:", state.isSubscribed);
           });
+
+          // تفعيل استقبال الإشعارات والتطبيق مفتوح
+          OS.setNotificationWillShowInForegroundHandler((event: any) => {
+            event.complete(event.getNotification());
+          });
+
         } catch (e) {
-          console.error("OneSignal init error:", e);
+          console.error("OneSignal Init Error:", e);
         }
       }
     };
 
-    initOneSignal();
+    // انتظر حتى يكون النظام جاهزاً
+    document.addEventListener("deviceready", initOneSignal, false);
   }, []);
 
   return (
