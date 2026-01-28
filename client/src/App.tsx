@@ -21,38 +21,6 @@ import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import { NotificationPrompt } from "@/components/NotificationPrompt";
 
-function PreviewHome() {
-  return <PreviewShell><Home /></PreviewShell>;
-}
-
-function PreviewCategoryList() {
-  return <PreviewShell><CategoryList /></PreviewShell>;
-}
-
-function PreviewCategoryDetail() {
-  return <PreviewShell><CategoryDetail /></PreviewShell>;
-}
-
-function PreviewBusinessDetail() {
-  return <PreviewShell><BusinessDetail /></PreviewShell>;
-}
-
-function PreviewSearchResults() {
-  return <PreviewShell><SearchResults /></PreviewShell>;
-}
-
-function PreviewMapView() {
-  return <PreviewShell><MapView /></PreviewShell>;
-}
-
-function PreviewOffers() {
-  return <PreviewShell><Offers /></PreviewShell>;
-}
-
-function PreviewFavorites() {
-  return <PreviewShell><Favorites /></PreviewShell>;
-}
-
 function Router() {
   return (
     <Switch>
@@ -67,14 +35,7 @@ function Router() {
       <Route path="/compare" component={Compare} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={AdminDashboard} />
-      <Route path="/preview" component={PreviewHome} />
-      <Route path="/preview/categories" component={PreviewCategoryList} />
-      <Route path="/preview/categories/:id" component={PreviewCategoryDetail} />
-      <Route path="/preview/businesses/:id" component={PreviewBusinessDetail} />
-      <Route path="/preview/search" component={PreviewSearchResults} />
-      <Route path="/preview/map" component={PreviewMapView} />
-      <Route path="/preview/offers" component={PreviewOffers} />
-      <Route path="/preview/favorites" component={PreviewFavorites} />
+      <Route path="/preview" component={Home} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -82,23 +43,23 @@ function Router() {
 
 function App() {
   useEffect(() => {
-    // حل مشكلة Vite عبر استخدام استيراد نصي ديناميكي تماماً
-    const setupNotifications = async () => {
+    // تشغيل الإشعارات فقط إذا كان التطبيق يعمل على موبايل
+    const initOneSignal = async () => {
       if (window.hasOwnProperty('cordova')) {
         try {
           // @ts-ignore
-          const OneSignal = (await import(/* @vite-ignore */ 'onesignal-cordova-plugin')).default;
+          const OneSignal = (await import('onesignal-cordova-plugin')).default;
           OneSignal.setAppId("d4d5d6d7-eece-42c5-b891-94560d5ad7e3");
           OneSignal.promptForPushNotificationsWithUserResponse((accepted: boolean) => {
             console.log("User accepted notifications: ", accepted);
           });
         } catch (e) {
-          console.error("OneSignal error", e);
+          console.error("OneSignal init error:", e);
         }
       }
     };
-    
-    setupNotifications();
+
+    initOneSignal();
   }, []);
 
   return (
