@@ -23,25 +23,32 @@ export function NotificationPrompt() {
   const handleAllow = async () => {
     setIsLoading(true);
     
-    // طلب الإذن من نظام الأندرويد عبر ون سيجنال
-    const OS = (window as any).plugins?.OneSignal || (window as any).OneSignal;
-    
-    if (OS) {
-      OS.promptForPushNotificationsWithUserResponse((accepted: boolean) => {
-        console.log("User accepted notifications: ", accepted);
+    try {
+      // الوصول لمكتبة ون سيجنال بالطريقة الصحيحة لـ Capacitor الحديث
+      const OneSignal = (window as any).OneSignal;
+      
+      if (OneSignal && OneSignal.Notifications) {
+        // طلب الإذن الرسمي الذي سيفتح نافذة أندرويد
+        await OneSignal.Notifications.requestPermission(true);
+        
+        // حفظ الحالة وإغلاق النافذة بعد الرد
         localStorage.setItem('delini_notified_v1', 'true');
         setShowPrompt(false);
-        setIsLoading(false);
-      });
-    } else {
-      // إذا كان يعمل على متصفح عادي
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          localStorage.setItem('delini_notified_v1', 'true');
+      } else {
+        // الدخول هنا في حال المتصفح أو إذا لم تكن الإضافة محملة
+        if ('Notification' in window) {
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            localStorage.setItem('delini_notified_v1', 'true');
+          }
         }
+        setShowPrompt(false);
       }
+    } catch (error) {
+      console.error("OneSignal Error:", error);
+      // إغلاق النافذة حتى في حال الخطأ لمنع تعليق الزر
       setShowPrompt(false);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -76,7 +83,7 @@ export function NotificationPrompt() {
                       size="sm"
                       onClick={handleAllow}
                       disabled={isLoading}
-                      className="bg-amber-500 hover:bg-amber-600 text-black"
+                      className="bg-amber-500 hover:bg-amber-600 text-black min-w-[100px]"
                     >
                       {isLoading ? 'جاري التفعيل...' : 'تفعيل'}
                     </Button>
