@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "delini-app",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
@@ -8,13 +8,28 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "cap:sync": "npx cap sync",
+    "cap:add:android": "npx cap add android",
+    "cap:copy": "npx cap copy",
+    "cap:update": "npx cap update",
+    "android:build": "cd android && ./gradlew assembleDebug",
+    "android:clean": "cd android && ./gradlew clean",
+    "android:release": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "@capacitor/android": "^8.0.1",
     "@capacitor/cli": "^7.4.5",
     "@capacitor/core": "^8.0.1",
+    "@capacitor/geolocation": "^5.0.6",
+    "@capacitor/local-notifications": "^5.0.6",
+    "@capacitor/push-notifications": "^5.0.6",
+    "@capacitor/app": "^5.0.6",
+    "@capacitor/haptics": "^5.0.6",
+    "@capacitor/keyboard": "^5.0.6",
+    "@capacitor/status-bar": "^5.0.6",
+    "@capacitor/camera": "^5.0.6",
     "@google-cloud/storage": "^7.18.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
@@ -123,5 +138,17 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "capacitor": {
+    "ios": {
+      "path": "ios"
+    },
+    "android": {
+      "path": "android"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
