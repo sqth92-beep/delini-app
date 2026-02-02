@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useBusinesses, useCities, useCategories } from "@/hooks/use-directory";
 import { Header, BottomNavigation } from "@/components/Navigation";
@@ -15,9 +15,23 @@ import { Link } from "wouter";
 
 export default function SearchResults() {
   const { t, language } = useI18n();
-  const [location] = useLocation();
-  const searchParams = new URLSearchParams(location.split('?')[1]);
-  const query = searchParams.get('q') || "";
+  const [locationString] = useLocation();
+  
+  // 🔧 FIXED: Better URL parsing
+  const getQueryFromURL = () => {
+    try {
+      const queryIndex = locationString.indexOf('?');
+      if (queryIndex === -1) return "";
+      
+      const queryString = locationString.substring(queryIndex + 1);
+      const params = new URLSearchParams(queryString);
+      return params.get('q')?.trim() || "";
+    } catch {
+      return "";
+    }
+  };
+  
+  const query = getQueryFromURL();
 
   const [showFilters, setShowFilters] = useState(false);
   const [minRating, setMinRating] = useState<number | undefined>(undefined);
@@ -28,8 +42,15 @@ export default function SearchResults() {
 
   const { latitude, longitude, loading: geoLoading, permissionDenied, requestLocation } = useGeolocation();
   const { data: cities } = useCities();
+  
+  // 🔧 FIXED: Add debug logging
+  useEffect(() => {
+    console.log("🔍 Search query from URL:", query);
+    console.log("🔍 Full URL:", locationString);
+  }, [query, locationString]);
+  
   const { data: businesses, isLoading } = useBusinesses({ 
-    search: query,
+    search: query, // ✅ Now this should work
     minRating,
     cityId: selectedCity,
     userLat: latitude,
@@ -74,6 +95,9 @@ export default function SearchResults() {
     return result;
   }, [businesses, openNowOnly, sortByRating]);
 
+  // 🔧 FIXED: Show message when no search query
+  const hasSearchQuery = query.length > 0;
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header title={t("search.results")} backHref="/" />
@@ -113,6 +137,17 @@ export default function SearchResults() {
             </Button>
           )}
         </div>
+
+        {/* 🔧 FIXED: Show message when no search term */}
+        {!hasSearchQuery && !hasFilters && (
+          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+            <p className="text-blue-700 dark:text-blue-300 text-center">
+              {language === "ar" 
+                ? "🔍 اكتب في المربع أعلاه للبحث عن محلات معينة، أو استخدم الفلاتر للتصفية."
+                : "🔍 Type in the search box above to find specific businesses, or use filters to narrow results."}
+            </p>
+          </div>
+        )}
 
         <AnimatePresence>
           {showFilters && (
@@ -265,8 +300,8 @@ export default function SearchResults() {
           <div className="space-y-4">
             <h2 className="text-sm font-medium text-muted-foreground mb-2">
               {language === "ar" 
-                ? `وجدنا ${filteredBusinesses.length} نتيجة ${query ? `لـ "${query}"` : ""}`
-                : `Found ${filteredBusinesses.length} result${filteredBusinesses.length > 1 ? 's' : ''} ${query ? `for "${query}"` : ""}`
+                ? `${hasSearchQuery ? `نتائج البحث عن "${query}"` : "جميع المحلات"} (${filteredBusinesses.length} نتيجة)`
+                : `${hasSearchQuery ? `Results for "${query}"` : "All businesses"} (${filteredBusinesses.length} result${filteredBusinesses.length > 1 ? 's' : ''})`
               }
             </h2>
             {filteredBusinesses.map((business, idx) => (
@@ -277,12 +312,28 @@ export default function SearchResults() {
           <div className="flex flex-col items-center justify-center pt-20 text-center text-muted-foreground">
             <SearchX className="w-16 h-16 mb-4 opacity-20" />
             <h3 className="text-lg font-bold mb-2">{t("search.noResults")}</h3>
-            <p>{language === "ar" ? "لم نتمكن من العثور على أي نتائج لبحثك." : "We couldn't find any results for your search."}</p>
-            <p className="text-sm mt-1 mb-4">{language === "ar" ? "جرب كلمات مفتاحية أخرى أو قم بتغيير الفلاتر." : "Try different keywords or change the filters."}</p>
+            <p>
+              {language === "ar" 
+                ? hasSearchQuery 
+                  ? `لم نتمكن من العثور على نتائج لـ "${query}"`
+                  : "لم نتمكن من العثور على أي محلات."
+                : hasSearchQuery
+                  ? `We couldn't find any results for "${query}"`
+                  : "We couldn't find any businesses."
+              }
+            </p>
+            <p className="text-sm mt-1 mb-4">
+              {language === "ar" 
+                ? "جرب كلمات مفتاحية أخرى أو قم بتغيير الفلاتر."
+                : "Try different keywords or change the filters."
+              }
+            </p>
             
             {categories && categories.length > 0 && (
               <div className="mt-6 w-full max-w-md">
-                <p className="text-sm font-medium mb-3">{language === "ar" ? "تصفح الأقسام:" : "Browse categories:"}</p>
+                <p className="text-sm font-medium mb-3">
+                  {language === "ar" ? "تصفح الأقسام:" : "Browse categories:"}
+                </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {categories.slice(0, 6).map((cat) => (
                     <Link 
