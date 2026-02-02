@@ -17,16 +17,27 @@ export default function SearchResults() {
   const { t, language } = useI18n();
   const [locationString] = useLocation();
   
-  // 🔧 FIXED: Better URL parsing
+  // 🔧 FIXED: Better URL parsing with debug
   const getQueryFromURL = () => {
     try {
+      console.log("🔗 Full URL:", locationString);
+      
       const queryIndex = locationString.indexOf('?');
-      if (queryIndex === -1) return "";
+      if (queryIndex === -1) {
+        console.log("⚠️ No query string found");
+        return "";
+      }
       
       const queryString = locationString.substring(queryIndex + 1);
+      console.log("📝 Query string:", queryString);
+      
       const params = new URLSearchParams(queryString);
-      return params.get('q')?.trim() || "";
-    } catch {
+      const query = params.get('q')?.trim() || "";
+      
+      console.log("🔍 Extracted query:", query);
+      return query;
+    } catch (error) {
+      console.error("❌ Error parsing URL:", error);
       return "";
     }
   };
@@ -43,20 +54,38 @@ export default function SearchResults() {
   const { latitude, longitude, loading: geoLoading, permissionDenied, requestLocation } = useGeolocation();
   const { data: cities } = useCities();
   
-  // 🔧 FIXED: Add debug logging
+  // 🔧 DEBUG: Log what's being sent to API
   useEffect(() => {
-    console.log("🔍 Search query from URL:", query);
-    console.log("🔍 Full URL:", locationString);
-  }, [query, locationString]);
+    console.log("🚀 Sending to API:", {
+      search: query,
+      hasQuery: query.length > 0,
+      minRating,
+      cityId: selectedCity,
+      userLat: latitude,
+      userLng: longitude,
+      sortByDistance
+    });
+  }, [query, minRating, selectedCity, latitude, longitude, sortByDistance]);
   
-  const { data: businesses, isLoading } = useBusinesses({ 
-    search: query, // ✅ Now this should work
+  const { data: businesses, isLoading, error } = useBusinesses({ 
+    search: query,
     minRating,
     cityId: selectedCity,
     userLat: latitude,
     userLng: longitude,
     sortByDistance,
   });
+
+  // 🔧 DEBUG: Log API response
+  useEffect(() => {
+    if (businesses) {
+      console.log("✅ API Response - Businesses count:", businesses.length);
+      console.log("📊 First business:", businesses[0]?.name);
+    }
+    if (error) {
+      console.error("❌ API Error:", error);
+    }
+  }, [businesses, error]);
 
   const ratingOptions = [
     { value: undefined, label: language === "ar" ? "الكل" : "All" },
@@ -76,6 +105,7 @@ export default function SearchResults() {
 
   const hasFilters = minRating !== undefined || selectedCity !== undefined || openNowOnly || sortByRating;
   const filterCount = [minRating, selectedCity, openNowOnly, sortByRating].filter(Boolean).length;
+  const hasSearchQuery = query.length > 0;
 
   const filteredBusinesses = useMemo(() => {
     if (!businesses) return [];
@@ -92,33 +122,31 @@ export default function SearchResults() {
       result.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
     }
     
+    console.log("🎯 Filtered businesses:", result.length);
     return result;
   }, [businesses, openNowOnly, sortByRating]);
 
-  // 🔧 FIXED: Show message when no search query
-  const hasSearchQuery = query.length > 0;
-
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black pb-20">
       <Header title={t("search.results")} backHref="/" />
       
       <main className="container mx-auto px-4 py-6">
-        <div className="mb-4">
+        <div className="mb-6">
           <SearchBar initialValue={query} />
         </div>
 
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-6">
           <Button
             variant={showFilters ? "default" : "outline"}
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
-            className="gap-1"
+            className="gap-1 bg-gradient-to-r from-amber-900 to-amber-800 hover:from-amber-800 hover:to-amber-700 text-amber-50 border-amber-700"
             data-testid="button-toggle-filters"
           >
             <Filter className="w-4 h-4" />
             {language === "ar" ? "الفلاتر" : "Filters"}
             {hasFilters && (
-              <span className="w-5 h-5 rounded-full bg-primary-foreground text-primary text-xs flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-amber-300 text-amber-900 text-xs flex items-center justify-center">
                 {filterCount}
               </span>
             )}
@@ -129,7 +157,7 @@ export default function SearchResults() {
               variant="ghost"
               size="sm"
               onClick={clearFilters}
-              className="gap-1 text-muted-foreground"
+              className="gap-1 text-amber-300 hover:text-amber-100 hover:bg-amber-900/30"
               data-testid="button-clear-filters"
             >
               <X className="w-4 h-4" />
@@ -138,13 +166,13 @@ export default function SearchResults() {
           )}
         </div>
 
-        {/* 🔧 FIXED: Show message when no search term */}
+        {/* 🔧 FIXED: Styled message when no search term */}
         {!hasSearchQuery && !hasFilters && (
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-            <p className="text-blue-700 dark:text-blue-300 text-center">
+          <div className="mb-6 p-4 bg-gradient-to-r from-amber-900/30 to-amber-950/40 border border-amber-800/40 rounded-xl backdrop-blur-sm">
+            <p className="text-amber-200 text-center font-medium text-sm">
               {language === "ar" 
-                ? "🔍 اكتب في المربع أعلاه للبحث عن محلات معينة، أو استخدم الفلاتر للتصفية."
-                : "🔍 Type in the search box above to find specific businesses, or use filters to narrow results."}
+                ? "🔍 اكتب في المربع أعلاه للبحث عن محلات معينة، أو استخدم الفلاتر للتصفية"
+                : "🔍 Type in the search box above to find specific businesses, or use filters to narrow results"}
             </p>
           </div>
         )}
@@ -155,40 +183,40 @@ export default function SearchResults() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden mb-4"
+              className="overflow-hidden mb-6"
             >
-              <div className="bg-card rounded-2xl border border-border p-4 space-y-4">
+              <div className="bg-gradient-to-br from-gray-900 to-gray-950 rounded-2xl border border-amber-900/30 p-4 space-y-4 shadow-xl">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Navigation className="w-4 h-4 text-primary" />
+                  <label className="text-sm font-medium text-amber-300 mb-2 flex items-center gap-1">
+                    <Navigation className="w-4 h-4 text-amber-400" />
                     {language === "ar" ? "الترتيب حسب الموقع" : "Sort by Location"}
                   </label>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {latitude && longitude ? (
                       <button
                         onClick={() => setSortByDistance(!sortByDistance)}
-                        className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
                           sortByDistance
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            ? "bg-gradient-to-r from-amber-700 to-amber-600 text-amber-50 shadow-lg shadow-amber-900/50"
+                            : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-amber-200"
                         }`}
                         data-testid="filter-sort-distance"
                       >
                         {language === "ar" ? "الأقرب أولاً" : "Nearest First"}
                       </button>
                     ) : permissionDenied ? (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-amber-300/70">
                         {language === "ar" ? "تم رفض الوصول للموقع" : "Location access denied"}
                       </span>
                     ) : geoLoading ? (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span className="text-xs text-amber-300/70 flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         {language === "ar" ? "جاري تحديد الموقع..." : "Getting location..."}
                       </span>
                     ) : (
                       <button
                         onClick={requestLocation}
-                        className="px-3 py-1.5 rounded-full text-sm bg-muted text-muted-foreground hover:bg-muted/80"
+                        className="px-3 py-1.5 rounded-full text-sm bg-gradient-to-r from-amber-900/50 to-amber-800/50 text-amber-200 hover:from-amber-800/60 hover:to-amber-700/60 transition-all duration-200"
                         data-testid="button-enable-location"
                       >
                         {language === "ar" ? "تفعيل الموقع" : "Enable Location"}
@@ -199,17 +227,17 @@ export default function SearchResults() {
 
                 {cities && cities.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                      <MapPin className="w-4 h-4 text-primary" />
+                    <label className="text-sm font-medium text-amber-300 mb-2 flex items-center gap-1">
+                      <MapPin className="w-4 h-4 text-amber-400" />
                       {t("city.selectCity")}
                     </label>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <button
                         onClick={() => setSelectedCity(undefined)}
-                        className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
                           selectedCity === undefined
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            ? "bg-gradient-to-r from-amber-700 to-amber-600 text-amber-50 shadow-lg shadow-amber-900/50"
+                            : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-amber-200"
                         }`}
                         data-testid="filter-city-all"
                       >
@@ -219,10 +247,10 @@ export default function SearchResults() {
                         <button
                           key={city.id}
                           onClick={() => setSelectedCity(city.id)}
-                          className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                          className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
                             selectedCity === city.id
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              ? "bg-gradient-to-r from-amber-700 to-amber-600 text-amber-50 shadow-lg shadow-amber-900/50"
+                              : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-amber-200"
                           }`}
                           data-testid={`filter-city-${city.id}`}
                         >
@@ -233,8 +261,8 @@ export default function SearchResults() {
                   </div>
                 )}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Star className="w-4 h-4 text-primary" />
+                  <label className="text-sm font-medium text-amber-300 mb-2 flex items-center gap-1">
+                    <Star className="w-4 h-4 text-amber-400" />
                     {t("search.minRating")}
                   </label>
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -242,10 +270,10 @@ export default function SearchResults() {
                       <button
                         key={option.label}
                         onClick={() => setMinRating(option.value)}
-                        className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
                           minRating === option.value
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            ? "bg-gradient-to-r from-amber-700 to-amber-600 text-amber-50 shadow-lg shadow-amber-900/50"
+                            : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-amber-200"
                         }`}
                         data-testid={`filter-rating-${option.value ?? 'all'}`}
                       >
@@ -256,17 +284,17 @@ export default function SearchResults() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-primary" />
+                  <label className="text-sm font-medium text-amber-300 mb-2 flex items-center gap-1">
+                    <Clock className="w-4 h-4 text-amber-400" />
                     {language === "ar" ? "خيارات إضافية" : "Additional Options"}
                   </label>
                   <div className="flex flex-wrap gap-2 mt-2">
                     <button
                       onClick={() => setOpenNowOnly(!openNowOnly)}
-                      className={`px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 flex items-center gap-1 ${
                         openNowOnly
-                          ? "bg-green-500 text-white"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          ? "bg-gradient-to-r from-emerald-700 to-emerald-600 text-white shadow-lg shadow-emerald-900/50"
+                          : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-emerald-200"
                       }`}
                       data-testid="filter-open-now"
                     >
@@ -275,10 +303,10 @@ export default function SearchResults() {
                     </button>
                     <button
                       onClick={() => setSortByRating(!sortByRating)}
-                      className={`px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 flex items-center gap-1 ${
                         sortByRating
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          ? "bg-gradient-to-r from-amber-700 to-amber-600 text-amber-50 shadow-lg shadow-amber-900/50"
+                          : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-amber-200"
                       }`}
                       data-testid="filter-sort-rating"
                     >
@@ -294,11 +322,16 @@ export default function SearchResults() {
 
         {isLoading ? (
           <div className="flex justify-center pt-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 animate-spin text-amber-400 mx-auto mb-4" />
+              <p className="text-amber-300 font-medium">
+                {language === "ar" ? "جاري البحث عن المحلات..." : "Searching for businesses..."}
+              </p>
+            </div>
           </div>
         ) : filteredBusinesses && filteredBusinesses.length > 0 ? (
           <div className="space-y-4">
-            <h2 className="text-sm font-medium text-muted-foreground mb-2">
+            <h2 className="text-sm font-medium text-amber-300 mb-2">
               {language === "ar" 
                 ? `${hasSearchQuery ? `نتائج البحث عن "${query}"` : "جميع المحلات"} (${filteredBusinesses.length} نتيجة)`
                 : `${hasSearchQuery ? `Results for "${query}"` : "All businesses"} (${filteredBusinesses.length} result${filteredBusinesses.length > 1 ? 's' : ''})`
@@ -309,10 +342,15 @@ export default function SearchResults() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center pt-20 text-center text-muted-foreground">
-            <SearchX className="w-16 h-16 mb-4 opacity-20" />
-            <h3 className="text-lg font-bold mb-2">{t("search.noResults")}</h3>
-            <p>
+          <div className="flex flex-col items-center justify-center pt-20 text-center text-amber-300/80">
+            <div className="relative mb-6">
+              <SearchX className="w-20 h-20 opacity-20" />
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-900/20 to-transparent rounded-full blur-xl" />
+            </div>
+            <h3 className="text-xl font-bold mb-3 text-amber-200">
+              {t("search.noResults")}
+            </h3>
+            <p className="max-w-md mb-6">
               {language === "ar" 
                 ? hasSearchQuery 
                   ? `لم نتمكن من العثور على نتائج لـ "${query}"`
@@ -322,7 +360,7 @@ export default function SearchResults() {
                   : "We couldn't find any businesses."
               }
             </p>
-            <p className="text-sm mt-1 mb-4">
+            <p className="text-sm text-amber-300/60 mb-8">
               {language === "ar" 
                 ? "جرب كلمات مفتاحية أخرى أو قم بتغيير الفلاتر."
                 : "Try different keywords or change the filters."
@@ -331,7 +369,7 @@ export default function SearchResults() {
             
             {categories && categories.length > 0 && (
               <div className="mt-6 w-full max-w-md">
-                <p className="text-sm font-medium mb-3">
+                <p className="text-sm font-medium mb-3 text-amber-300">
                   {language === "ar" ? "تصفح الأقسام:" : "Browse categories:"}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -339,7 +377,7 @@ export default function SearchResults() {
                     <Link 
                       key={cat.id}
                       href={`/categories/${cat.id}`}
-                      className="px-3 py-1.5 rounded-full bg-muted text-sm hover:bg-primary hover:text-primary-foreground transition-colors"
+                      className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-900/40 to-amber-950/40 text-amber-200 text-sm hover:from-amber-800/50 hover:to-amber-900/50 hover:text-amber-100 transition-all duration-200 border border-amber-800/30"
                       data-testid={`suggestion-category-${cat.id}`}
                     >
                       {cat.name}
