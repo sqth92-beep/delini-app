@@ -1,17 +1,41 @@
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { usePreviewNavigate } from "@/lib/preview-context";
+import { useNavigate } from "wouter"; // ✅ استخدام الـ router الحقيقي
 
 export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
   const { t } = useI18n();
   const [value, setValue] = useState(initialValue);
-  const navigate = usePreviewNavigate();
+  const navigate = useNavigate(); // ✅ هذا يعمل في APK
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (value.trim()) {
-      navigate(`/search?q=${encodeURIComponent(value.trim())}`);
+    const query = value.trim();
+    
+    if (query) {
+      // ✅ طريقة موثوقة تعمل في APK وWeb
+      const searchUrl = `/search?q=${encodeURIComponent(query)}`;
+      
+      // الطريقة الأساسية
+      navigate(searchUrl);
+      
+      // تأكيد للـ WebView في Capacitor
+      if (typeof window !== 'undefined' && window.history) {
+        try {
+          window.history.pushState({}, '', searchUrl);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        } catch (err) {
+          console.log("History API not available in this environment");
+        }
+      }
+    } else {
+      navigate('/search');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
     }
   };
 
@@ -33,6 +57,7 @@ export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
           placeholder={t("search.placeholder")}
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
           data-testid="input-search"
         />
         <button 
@@ -48,6 +73,15 @@ export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
           {t("search.button")}
         </button>
       </div>
+      
+      {/* مساعدة للمستخدم */}
+      {value.trim().length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 px-2">
+          <div className="text-xs text-muted-foreground bg-popover/80 backdrop-blur-sm rounded-lg p-2 border">
+            {t("search.pressEnter") || "Press Enter to search"}
+          </div>
+        </div>
+      )}
     </form>
   );
 }
