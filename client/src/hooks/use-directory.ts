@@ -74,7 +74,8 @@ export function useBusinesses(params?: {
   userLng?: number | null;
   sortByDistance?: boolean;
 }) {
-  const queryKey = [api.businesses.list.path, params];
+  // 🔧 FIXED: Unique query key for search to prevent cache issues
+  const queryKey = ['/api/businesses/search', JSON.stringify(params || {})];
 
   return useQuery({
     queryKey,
@@ -90,12 +91,25 @@ export function useBusinesses(params?: {
 
       const url = `${api.businesses.list.path}?${searchParams.toString()}`;
       
+      // 🔧 DEBUG: Log the actual request URL
+      console.log("🌐 Fetching businesses from:", config.getFullUrl(url));
+      
       const res = await fetch(config.getFullUrl(url), { 
         headers: config.getHeaders(false) 
       });
-      if (!res.ok) throw new Error('Failed to fetch businesses');
-      return res.json() as Promise<(BusinessResponse & { distance?: number })[]>;
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ API Error:", errorText);
+        throw new Error('Failed to fetch businesses');
+      }
+      
+      const data = await res.json();
+      console.log("✅ Received businesses:", data.length);
+      return data as (BusinessResponse & { distance?: number })[];
     },
+    // 🔧 FIXED: Disable cache for search queries
+    staleTime: 0,
+    cacheTime: 0,
   });
 }
 
@@ -165,7 +179,7 @@ export function useCreateReview(businessId: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/businesses', businessId, 'reviews'] });
       queryClient.invalidateQueries({ queryKey: [api.businesses.get.path, businessId] });
-      queryClient.invalidateQueries({ queryKey: [api.businesses.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/businesses/search'] });
     },
   });
 }
