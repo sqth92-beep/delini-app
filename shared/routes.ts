@@ -46,16 +46,32 @@ export const api = {
         categoryId: z.coerce.number().optional(),
         search: z.string().optional(),
         minRating: z.coerce.number().optional(),
+        cityId: z.coerce.number().optional(),
+        userLat: z.coerce.number().optional(),
+        userLng: z.coerce.number().optional(),
+        sortByDistance: z.coerce.boolean().optional(),
+        limit: z.coerce.number().optional(),
+        offset: z.coerce.number().optional(),
       }).optional(),
       responses: {
-        200: z.array(z.custom<typeof businesses.$inferSelect & { category?: typeof categories.$inferSelect; averageRating?: number; reviewCount?: number }>()),
+        200: z.array(z.custom<typeof businesses.$inferSelect & { 
+          category?: typeof categories.$inferSelect; 
+          averageRating?: number; 
+          reviewCount?: number;
+          distance?: number;
+        }>()),
       },
     },
     get: {
       method: 'GET' as const,
       path: '/api/businesses/:id',
       responses: {
-        200: z.custom<typeof businesses.$inferSelect & { category: typeof categories.$inferSelect; averageRating?: number; reviewCount?: number }>(),
+        200: z.custom<typeof businesses.$inferSelect & { 
+          category: typeof categories.$inferSelect; 
+          averageRating?: number; 
+          reviewCount?: number;
+          distance?: number;
+        }>(),
         404: errorSchemas.notFound,
       },
     },
@@ -63,7 +79,12 @@ export const api = {
       method: 'GET' as const,
       path: '/api/businesses/map',
       responses: {
-        200: z.array(z.custom<typeof businesses.$inferSelect & { category?: typeof categories.$inferSelect; averageRating?: number; reviewCount?: number }>()),
+        200: z.array(z.custom<typeof businesses.$inferSelect & { 
+          category?: typeof categories.$inferSelect; 
+          averageRating?: number; 
+          reviewCount?: number;
+          distance?: number;
+        }>()),
       },
     },
   },
@@ -108,6 +129,24 @@ export const api = {
       },
     },
   },
+  uploads: {
+    requestUrl: {
+      method: 'POST' as const,
+      path: '/api/uploads/request-url',
+      input: z.object({
+        name: z.string(),
+        size: z.number(),
+        contentType: z.string(),
+      }),
+      responses: {
+        200: z.object({
+          uploadURL: z.string(),
+          uploadPreset: z.string(),
+          folder: z.string().optional(),
+        }),
+      },
+    },
+  },
 };
 
 // ============================================
@@ -133,3 +172,4 @@ export type BusinessListResponse = z.infer<typeof api.businesses.list.responses[
 export type BusinessDetailResponse = z.infer<typeof api.businesses.get.responses[200]>;
 export type ReviewResponse = z.infer<typeof api.reviews.list.responses[200]>[number];
 export type OfferResponse = z.infer<typeof api.offers.list.responses[200]>[number];
+export type UploadResponse = z.infer<typeof api.uploads.requestUrl.responses[200]>;
