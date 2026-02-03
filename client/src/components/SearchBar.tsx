@@ -1,35 +1,32 @@
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { useNavigate } from "wouter"; // ✅ استخدام الـ router الحقيقي
+import { useLocation } from "wouter"; // ✅ هذا هو الصحيح
 
 export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
   const { t } = useI18n();
   const [value, setValue] = useState(initialValue);
-  const navigate = useNavigate(); // ✅ هذا يعمل في APK
+  const [, setLocation] = useLocation(); // ✅ استخدام useLocation
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const query = value.trim();
     
     if (query) {
-      // ✅ طريقة موثوقة تعمل في APK وWeb
-      const searchUrl = `/search?q=${encodeURIComponent(query)}`;
+      // ✅ الطريقة الصحيحة مع wouter
+      setLocation(`/search?q=${encodeURIComponent(query)}`);
       
-      // الطريقة الأساسية
-      navigate(searchUrl);
-      
-      // تأكيد للـ WebView في Capacitor
-      if (typeof window !== 'undefined' && window.history) {
+      // تأكيد إضافي للـ WebView
+      if (typeof window !== 'undefined') {
         try {
-          window.history.pushState({}, '', searchUrl);
-          window.dispatchEvent(new PopStateEvent('popstate'));
+          const newUrl = `${window.location.origin}/search?q=${encodeURIComponent(query)}`;
+          window.history.pushState({ path: newUrl }, '', newUrl);
         } catch (err) {
-          console.log("History API not available in this environment");
+          // تجاهل الخطأ إذا الـ API غير متوفر
         }
       }
     } else {
-      navigate('/search');
+      setLocation('/search');
     }
   };
 
@@ -73,15 +70,6 @@ export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
           {t("search.button")}
         </button>
       </div>
-      
-      {/* مساعدة للمستخدم */}
-      {value.trim().length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 px-2">
-          <div className="text-xs text-muted-foreground bg-popover/80 backdrop-blur-sm rounded-lg p-2 border">
-            {t("search.pressEnter") || "Press Enter to search"}
-          </div>
-        </div>
-      )}
     </form>
   );
 }
