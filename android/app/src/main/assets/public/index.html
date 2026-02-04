@@ -7,10 +7,338 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Cairo:wght@200..1000&family=IBM+Plex+Sans+Arabic:wght@100..700&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    
+    <!-- CSS لتحسين البحث -->
+    <style>
+      /* شريط البحث الثابت */
+      .global-search-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        background: white;
+        padding: 15px 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      
+      .global-search-input {
+        flex: 1;
+        padding: 12px 20px;
+        border: 2px solid #4CAF50;
+        border-radius: 30px;
+        font-size: 16px;
+        font-family: 'Cairo', sans-serif;
+        outline: none;
+        transition: all 0.3s ease;
+      }
+      
+      .global-search-input:focus {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+      }
+      
+      .global-search-btn {
+        padding: 12px 25px;
+        background: linear-gradient(135deg, #4CAF50, #2E7D32);
+        color: white;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        font-family: 'Cairo', sans-serif;
+        transition: all 0.3s ease;
+      }
+      
+      .global-search-btn:hover {
+        background: linear-gradient(135deg, #45a049, #1B5E20);
+        transform: scale(1.05);
+      }
+      
+      /* نتائج البحث */
+      .search-results-overlay {
+        position: fixed;
+        top: 80px;
+        left: 20px;
+        right: 20px;
+        z-index: 9998;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        max-height: 500px;
+        overflow-y: auto;
+        display: none;
+      }
+      
+      .search-result-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      
+      .search-result-item:hover {
+        background: #f9f9f9;
+      }
+      
+      .search-result-item h4 {
+        margin: 0 0 8px 0;
+        color: #333;
+      }
+      
+      .search-result-item p {
+        margin: 5px 0;
+        color: #666;
+        font-size: 14px;
+      }
+      
+      .no-results {
+        padding: 30px;
+        text-align: center;
+        color: #888;
+      }
+      
+      /* إشعار */
+      .search-notification {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #4CAF50;
+        color: white;
+        padding: 12px 25px;
+        border-radius: 25px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        display: none;
+        z-index: 10000;
+        font-family: 'Cairo', sans-serif;
+      }
+    </style>
+    
     <script type="module" crossorigin src="/assets/index-DP9RZqmZ.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-bpVg0Pnq.css">
   </head>
   <body dir="rtl">
+    
+    <!-- شريط البحث الثابت -->
+    <div class="global-search-container">
+      <input 
+        type="text" 
+        class="global-search-input" 
+        id="globalSearchInput"
+        placeholder="🔍 ابحث عن مطعم، محل، خدمة..."
+        dir="rtl"
+      >
+      <button class="global-search-btn" id="globalSearchBtn">بحث</button>
+    </div>
+    
+    <!-- نتائج البحث -->
+    <div class="search-results-overlay" id="searchResults">
+      <!-- النتائج تظهر هنا -->
+    </div>
+    
+    <!-- إشعار -->
+    <div class="search-notification" id="searchNotification">
+      جاري البحث...
+    </div>
+    
+    <!-- التطبيق الأصلي -->
     <div id="root"></div>
+    
+    <!-- كود البحث -->
+    <script>
+      // بيانات النماذج (تعدلها ببياناتك الحقيقية)
+      const allPlaces = [
+        {
+          id: 1,
+          name: "مطعم باربكيو المنقل",
+          category: "مطاعم",
+          location: "البصره - الطوسية - ام...",
+          status: "مفتوح",
+          distance: "10.2 كم",
+          rating: "4.3"
+        },
+        {
+          id: 2,
+          name: "E-store",
+          category: "موبايلات",
+          location: "البصرية - شارع الجزائر",
+          status: "",
+          distance: "11.7 كم",
+          rating: "3.8"
+        },
+        {
+          id: 3,
+          name: "كافيه النخيل",
+          category: "مقاهي",
+          location: "البصرة - وسط المدينة",
+          status: "مفتوح",
+          distance: "5.3 كم",
+          rating: "4.2"
+        },
+        {
+          id: 4,
+          name: "سوبر ماركت السلام",
+          category: "سوبرماركت",
+          location: "البصرة - الحي الصناعي",
+          status: "مغلق",
+          distance: "8.1 كم",
+          rating: "4.0"
+        },
+        {
+          id: 5,
+          name: "مطعم بيتزا فورنو",
+          category: "مطاعم",
+          location: "البصرة - كورنيش البحيرة",
+          status: "مفتوح",
+          distance: "12.5 كم",
+          rating: "4.5"
+        },
+        {
+          id: 6,
+          name: "صالون الرجال",
+          category: "صالونات",
+          location: "البصرة - حي الأندلس",
+          status: "مفتوح",
+          distance: "6.7 كم",
+          rating: "4.1"
+        },
+        {
+          id: 7,
+          name: "صيدلية الحياة",
+          category: "صيدليات",
+          location: "البصرة - شارع الخليج",
+          status: "مفتوح 24 ساعة",
+          distance: "3.2 كم",
+          rating: "4.7"
+        }
+      ];
+      
+      // العناصر
+      const searchInput = document.getElementById('globalSearchInput');
+      const searchBtn = document.getElementById('globalSearchBtn');
+      const resultsContainer = document.getElementById('searchResults');
+      const notification = document.getElementById('searchNotification');
+      
+      // بحث أثناء الكتابة
+      searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        
+        if (searchTerm.length === 0) {
+          hideResults();
+          return;
+        }
+        
+        if (searchTerm.length >= 1) { // يبحث من أول حرف
+          showNotification(`جاري البحث عن: ${searchTerm}`);
+          performSearch(searchTerm);
+        }
+      });
+      
+      // زر البحث
+      searchBtn.addEventListener('click', function() {
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+          performSearch(searchTerm);
+        }
+      });
+      
+      // دالة البحث
+      function performSearch(term) {
+        const searchTerm = term.toLowerCase();
+        
+        // تأخير بسيط لتحسين الأداء
+        setTimeout(() => {
+          const filtered = allPlaces.filter(place => {
+            return place.name.toLowerCase().includes(searchTerm) ||
+                   place.category.toLowerCase().includes(searchTerm) ||
+                   place.location.toLowerCase().includes(searchTerm);
+          });
+          
+          displayResults(filtered);
+          showNotification(`وجدنا ${filtered.length} نتيجة`);
+        }, 100);
+      }
+      
+      // عرض النتائج
+      function displayResults(results) {
+        resultsContainer.innerHTML = '';
+        
+        if (results.length === 0) {
+          resultsContainer.innerHTML = `
+            <div class="no-results">
+              <p>😔 لا توجد نتائج تطابق بحثك</p>
+              <p>حاول بكلمات أخرى</p>
+            </div>
+          `;
+        } else {
+          results.forEach(place => {
+            const item = document.createElement('div');
+            item.className = 'search-result-item';
+            item.innerHTML = `
+              <h4>${place.name}</h4>
+              <p><strong>${place.category}</strong> | 📍 ${place.location}</p>
+              ${place.rating ? `<p>⭐ ${place.rating} | 🚗 ${place.distance}</p>` : `<p>🚗 ${place.distance}</p>`}
+              ${place.status ? `<p style="color: ${place.status.includes('مغلق') ? '#f44336' : '#4CAF50'}">
+                ${place.status.includes('مفتوح') ? '✅ ' : '❌ '}${place.status}
+              </p>` : ''}
+            `;
+            
+            // عند النقر على نتيجة
+            item.addEventListener('click', function() {
+              searchInput.value = place.name;
+              hideResults();
+              showNotification(`اخترت: ${place.name}`);
+              
+              // هنا يمكنك إضافة ربط مع التطبيق الأصلي
+              // مثلاً: window.location.href = `/place/${place.id}`;
+            });
+            
+            resultsContainer.appendChild(item);
+          });
+        }
+        
+        showResults();
+      }
+      
+      // عرض/إخفاء النتائج
+      function showResults() {
+        resultsContainer.style.display = 'block';
+      }
+      
+      function hideResults() {
+        resultsContainer.style.display = 'none';
+      }
+      
+      // الإشعارات
+      function showNotification(text) {
+        notification.textContent = text;
+        notification.style.display = 'block';
+        setTimeout(() => {
+          notification.style.display = 'none';
+        }, 2000);
+      }
+      
+      // إخفاء النتائج عند النقر خارجها
+      document.addEventListener('click', function(event) {
+        if (!searchInput.contains(event.target) && 
+            !resultsContainer.contains(event.target) &&
+            !searchBtn.contains(event.target)) {
+          hideResults();
+        }
+      });
+      
+      // عند الضغط على Escape
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+          hideResults();
+        }
+      });
+    </script>
+    
   </body>
 </html>
