@@ -1,32 +1,22 @@
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { useLocation } from "wouter"; // ✅ هذا هو الصحيح
+import { useLocation } from "wouter";
 
 export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
   const { t } = useI18n();
   const [value, setValue] = useState(initialValue);
-  const [, setLocation] = useLocation(); // ✅ استخدام useLocation
+  const [, setLocation] = useLocation();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const query = value.trim();
     
     if (query) {
-      // ✅ الطريقة الصحيحة مع wouter
-      setLocation(`/search?q=${encodeURIComponent(query)}`);
-      
-      // تأكيد إضافي للـ WebView
-      if (typeof window !== 'undefined') {
-        try {
-          const newUrl = `${window.location.origin}/search?q=${encodeURIComponent(query)}`;
-          window.history.pushState({ path: newUrl }, '', newUrl);
-        } catch (err) {
-          // تجاهل الخطأ إذا الـ API غير متوفر
-        }
-      }
+      // تغيير الرابط مباشرة
+      window.location.hash = `/search?q=${encodeURIComponent(query)}`;
     } else {
-      setLocation('/search');
+      window.location.hash = '/search';
     }
   };
 
