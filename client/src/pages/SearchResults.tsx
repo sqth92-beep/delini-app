@@ -17,25 +17,33 @@ export default function SearchResults() {
   const { t, language } = useI18n();
   const [locationString] = useLocation();
   
-  // 🔧 FIXED: Better URL parsing with debug
+  // 🔧 FIXED: طريقة موثوقة لقراءة الـ query من الـ hash
   const getQueryFromURL = () => {
     try {
-      console.log("🔗 Full URL:", locationString);
+      // جرب من الـ hash أولاً (لـ Capacitor)
+      const hash = window.location.hash;
+      console.log("🔗 Window Hash:", hash);
+      console.log("🔗 locationString:", locationString);
       
-      const queryIndex = locationString.indexOf('?');
-      if (queryIndex === -1) {
-        console.log("⚠️ No query string found");
-        return "";
+      if (hash.includes('search?q=')) {
+        const start = hash.indexOf('q=') + 2;
+        const end = hash.indexOf('&') > -1 ? hash.indexOf('&') : hash.length;
+        const q = hash.substring(start, end);
+        const decoded = decodeURIComponent(q);
+        console.log("🔍 Query from hash:", decoded);
+        return decoded;
       }
       
-      const queryString = locationString.substring(queryIndex + 1);
-      console.log("📝 Query string:", queryString);
+      // إذا ما في hash، جرب الـ locationString
+      if (locationString.includes('?')) {
+        const params = new URLSearchParams(locationString.split('?')[1]);
+        const query = params.get('q')?.trim() || "";
+        console.log("🔍 Query from locationString:", query);
+        return query;
+      }
       
-      const params = new URLSearchParams(queryString);
-      const query = params.get('q')?.trim() || "";
-      
-      console.log("🔍 Extracted query:", query);
-      return query;
+      console.log("⚠️ No query found");
+      return "";
     } catch (error) {
       console.error("❌ Error parsing URL:", error);
       return "";
@@ -54,18 +62,16 @@ export default function SearchResults() {
   const { latitude, longitude, loading: geoLoading, permissionDenied, requestLocation } = useGeolocation();
   const { data: cities } = useCities();
   
-  // 🔧 DEBUG: Log what's being sent to API
+  // 🔧 DEBUG: عرض الكلمة في الشاشة للإختبار
+  const debugInfo = `كلمة البحث: "${query || '(فارغ)'}" | عدد الحروف: ${query.length}`;
+  
   useEffect(() => {
-    console.log("🚀 Sending to API:", {
-      search: query,
-      hasQuery: query.length > 0,
-      minRating,
-      cityId: selectedCity,
-      userLat: latitude,
-      userLng: longitude,
-      sortByDistance
-    });
-  }, [query, minRating, selectedCity, latitude, longitude, sortByDistance]);
+    console.log("=== SEARCH DEBUG ===");
+    console.log("Query:", query);
+    console.log("Window URL:", window.location.href);
+    console.log("Window Hash:", window.location.hash);
+    console.log("Location String:", locationString);
+  }, [query, locationString]);
   
   const { data: businesses, isLoading, error } = useBusinesses({ 
     search: query,
@@ -76,11 +82,12 @@ export default function SearchResults() {
     sortByDistance,
   });
 
-  // 🔧 DEBUG: Log API response
   useEffect(() => {
     if (businesses) {
       console.log("✅ API Response - Businesses count:", businesses.length);
-      console.log("📊 First business:", businesses[0]?.name);
+      if (businesses.length > 0) {
+        console.log("📊 Businesses found:", businesses.map(b => b.name).join(', '));
+      }
     }
     if (error) {
       console.error("❌ API Error:", error);
@@ -131,6 +138,16 @@ export default function SearchResults() {
       <Header title={t("search.results")} backHref="/" />
       
       <main className="container mx-auto px-4 py-6">
+        {/* 🔧 DEBUG: شريط إختباري - إزله بعد التأكد */}
+        <div className="mb-4 p-3 bg-red-900/80 border border-red-700 rounded-lg">
+          <div className="text-white text-sm font-mono">
+            <div className="font-bold">🔍 حالة البحث:</div>
+            <div>{debugInfo}</div>
+            <div>عدد النتائج: {filteredBusinesses?.length || 0}</div>
+            <div className="text-xs opacity-70 mt-1">هذا الشريط للإختبار فقط وسيتم إزالته</div>
+          </div>
+        </div>
+
         <div className="mb-6">
           <SearchBar initialValue={query} />
         </div>
