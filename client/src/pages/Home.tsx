@@ -4,7 +4,7 @@ import { SearchBar } from "@/components/SearchBar";
 import { CategoryCard } from "@/components/CategoryCard";
 import { BusinessCard } from "@/components/BusinessCard";
 import { OfferCard } from "@/components/OfferCard";
-import { Loader2, ArrowLeft, Tag, Users, Search, X } from "lucide-react";
+import { Loader2, ArrowLeft, Tag, Users, Search as SearchIcon, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useI18n } from "@/lib/i18n";
@@ -129,7 +129,7 @@ export default function Home() {
                 transition-all duration-300
               ">
                 <div className="grid place-items-center h-full w-14 text-muted-foreground group-focus-within:text-primary transition-colors">
-                  <Search className="w-6 h-6" />
+                  <SearchIcon className="w-6 h-6" />
                 </div>
                 <input
                   className="peer h-full w-full outline-none text-base text-foreground placeholder:text-muted-foreground bg-transparent ml-4 font-medium"
@@ -218,7 +218,7 @@ export default function Home() {
             {filteredBusinesses.length === 0 ? (
               <div className="text-center py-12 space-y-4">
                 <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-                  <Search className="w-8 h-8 text-muted-foreground" />
+                  <SearchIcon className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <h3 className="font-display font-bold text-xl text-foreground">
                   لا توجد نتائج
@@ -302,7 +302,7 @@ export default function Home() {
                   <Link href={prefixLink("/offers")} className="text-primary text-sm font-medium hover:underline flex items-center gap-1">
                     {t("home.viewAll")}
                     <ArrowLeft className="w-4 h-4" />
-                  </div>
+                  </Link>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {topOffers.map((offer, idx) => (
