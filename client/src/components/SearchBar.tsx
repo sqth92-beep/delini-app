@@ -3,7 +3,10 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useLocation } from "wouter";
 
-export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
+export function SearchBar({ initialValue = "", onSearch }: { 
+  initialValue?: string;
+  onSearch?: (query: string) => void; // ⬅️ أضف هذا
+}) {
   const { t } = useI18n();
   const [value, setValue] = useState(initialValue);
   const [, setLocation] = useLocation();
@@ -13,10 +16,20 @@ export function SearchBar({ initialValue = "" }: { initialValue?: string }) {
     const query = value.trim();
     
     if (query) {
-      // تغيير الرابط مباشرة
-      window.location.hash = `/search?q=${encodeURIComponent(query)}`;
+      // ⬇️⬇️⬇️ عدّل هنا ⬇️⬇️⬇️
+      if (onSearch) {
+        // إذا في دالة onSearch، نستدعيها (للبحث في Home)
+        onSearch(query);
+      } else {
+        // إذا ما في، نغير الـ URL عادي
+        setLocation(`/search?q=${encodeURIComponent(query)}`);
+      }
     } else {
-      window.location.hash = '/search';
+      if (onSearch) {
+        onSearch('');
+      } else {
+        setLocation('/search');
+      }
     }
   };
 
