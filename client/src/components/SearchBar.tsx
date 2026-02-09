@@ -17,8 +17,10 @@ export function SearchBar({ initialValue = "", onSearch }: {
     
     if (query) {
       if (onSearch) {
+        // إذا عندنا onSearch prop (مثل في Home.tsx)
         onSearch(query);
       } else {
+        // للصفحات الأخرى، نستخدم setLocation (بدون hash!)
         setLocation(`/search?q=${encodeURIComponent(query)}`);
       }
     } else {
