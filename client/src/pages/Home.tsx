@@ -4,7 +4,7 @@ import { SearchBar } from "@/components/SearchBar";
 import { CategoryCard } from "@/components/CategoryCard";
 import { BusinessCard } from "@/components/BusinessCard";
 import { OfferCard } from "@/components/OfferCard";
-import { Loader2, ArrowLeft, Tag, Users, Search as SearchIcon, X } from "lucide-react";
+import { Loader2, ArrowLeft, Tag, Users, Search as SearchIcon, X, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useI18n } from "@/lib/i18n";
@@ -14,6 +14,79 @@ import { useEffect, useRef, useState } from "react";
 import logoImg from "@assets/Delini_1768321622197.png";
 
 const NEW_OFFERS_IDS_KEY = "delini_seen_offer_ids";
+const LOCATION_KEY = 'delini_user_location';
+
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
+
+async function requestUserLocation(): Promise<UserLocation | null> {
+  if (!navigator.geolocation) {
+    console.warn('Geolocation غير مدعوم في هذا المتصفح');
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location: UserLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          timestamp: Date.now(),
+        };
+        
+        localStorage.setItem(LOCATION_KEY, JSON.stringify(location));
+        resolve(location);
+      },
+      (error) => {
+        console.warn('لم يتم الحصول على الموقع:', error.message);
+        
+        const defaultLocation: UserLocation = {
+          latitude: 30.5081,
+          longitude: 47.7835,
+          timestamp: Date.now(),
+        };
+        
+        localStorage.setItem(LOCATION_KEY, JSON.stringify(defaultLocation));
+        resolve(defaultLocation);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  });
+}
+
+function getSavedLocation(): UserLocation | null {
+  const saved = localStorage.getItem(LOCATION_KEY);
+  if (!saved) return null;
+  
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return null;
+  }
+}
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return Math.round(distance * 10) / 10;
+}
 
 export default function Home() {
   const { t } = useI18n();
@@ -23,9 +96,9 @@ export default function Home() {
   const { data: featuredBusinesses, isLoading: isBizLoading } = useBusinesses();
   const { data: offers } = useActiveOffers();
   
-  // حالة البحث
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   
   const hasIncremented = useRef(false);
   const hasCheckedOffers = useRef(false);
@@ -38,6 +111,22 @@ export default function Home() {
     if (!hasIncremented.current) {
       hasIncremented.current = true;
       fetch("/api/visitors/increment", { method: "POST" });
+    }
+    
+    const savedLocation = getSavedLocation();
+    if (savedLocation) {
+      setUserLocation(savedLocation);
+    } else {
+      requestUserLocation().then(location => {
+        if (location) {
+          setUserLocation(location);
+          toast({
+            title: "تم تحديد موقعك",
+            description: "الآن يمكنك رؤية المسافات الحقيقية",
+            duration: 3000,
+          });
+        }
+      });
     }
   }, []);
 
@@ -66,11 +155,9 @@ export default function Home() {
   const displayedVisitors = (visitorData?.count || 0) * 73;
 
   const topCategories = categories?.slice(0, 8);
-  // Only show VIP businesses in featured section
   const featured = featuredBusinesses?.filter(b => b.subscriptionTier === 'vip').slice(0, 5);
   const topOffers = offers?.slice(0, 3);
   
-  // فلترة النتائج عند البحث
   const allBusinesses = featuredBusinesses || [];
   const filteredBusinesses = searchTerm
     ? allBusinesses.filter(business => {
@@ -94,13 +181,65 @@ export default function Home() {
     setIsSearching(false);
   };
 
+  const calculateBusinessDistance = (business: any): string | null => {
+    if (!userLocation || !business.latitude || !business.longitude) {
+      return null;
+    }
+    
+    const distance = calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      business.latitude,
+      business.longitude
+    );
+    
+    return `${distance} كم`;
+  };
+
+  const showLocationStatus = () => {
+    if (!userLocation) {
+      return (
+        <div className="flex items-center justify-center gap-2 py-2 bg-blue-50">
+          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+          <span className="text-sm text-blue-700">جاري تحديد موقعك...</span>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex items-center justify-center gap-2 py-2 bg-green-50">
+        <MapPin className="w-4 h-4 text-green-600" />
+        <span className="text-sm text-green-700">
+          موقعك محدد | 
+          <button
+            onClick={() => {
+              requestUserLocation().then(loc => {
+                if (loc) {
+                  setUserLocation(loc);
+                  toast({
+                    title: "تم تحديث الموقع",
+                    description: "المسافات محدثة الآن",
+                    duration: 2000,
+                  });
+                }
+              });
+            }}
+            className="mr-2 text-green-800 hover:underline text-xs"
+          >
+            تحديث
+          </button>
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20 font-sans">
       <Header />
+      {showLocationStatus()}
       
       <main className="container mx-auto px-4 py-6 space-y-10">
         
-        {/* Hero Section - Logo blends with page */}
         <section className="text-center space-y-6 -mx-4 px-4">
           <div className="relative -mt-6">
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />
@@ -119,7 +258,6 @@ export default function Home() {
             </p>
           </div>
           
-          {/* شريط البحث المخصص مع فلترة فورية */}
           <div className="max-w-lg mx-auto relative">
             <div className="relative">
               <div className="
@@ -173,7 +311,6 @@ export default function Home() {
                 </button>
               </div>
               
-              {/* مؤشر البحث */}
               {isSearching && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-card rounded-xl shadow-xl border border-border/50 p-3 z-50">
                   <div className="flex justify-between items-center mb-2">
@@ -188,7 +325,6 @@ export default function Home() {
               )}
             </div>
             
-            {/* تلميح البحث */}
             {searchTerm.length === 0 && (
               <div className="mt-3 text-center">
                 <p className="text-xs text-muted-foreground">
@@ -199,7 +335,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* إذا في بحث - نعرض نتائج البحث فقط */}
         {isSearching ? (
           <section className="mt-4">
             <div className="flex items-center justify-between mb-6">
@@ -235,20 +370,22 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredBusinesses.map((business) => (
-                  <BusinessCard 
-                    key={business.id} 
-                    business={business} 
-                    layout="grid"
-                  />
-                ))}
+                {filteredBusinesses.map((business) => {
+                  const distance = calculateBusinessDistance(business);
+                  return (
+                    <BusinessCard 
+                      key={business.id} 
+                      business={business}
+                      distance={distance}
+                      layout="grid"
+                    />
+                  );
+                })}
               </div>
             )}
           </section>
         ) : (
-          // إذا ما في بحث - نعرض الصفحة الرئيسية العادية
           <>
-            {/* Categories Section */}
             <section>
               <div className="flex items-center justify-between mb-4 px-1">
                 <h3 className="font-display font-bold text-xl text-foreground">{t("home.categories")}</h3>
@@ -273,7 +410,6 @@ export default function Home() {
               )}
             </section>
 
-            {/* Featured Businesses Section - Only VIP */}
             {featured && featured.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-4 px-1">
@@ -281,17 +417,24 @@ export default function Home() {
                 </div>
 
                 <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 snap-x snap-mandatory">
-                  {featured.map((business, idx) => (
-                    <div key={business.id} className="min-w-[280px] w-[80%] md:w-[320px] snap-center">
-                      <BusinessCard business={business} layout="grid" index={idx} />
-                    </div>
-                  ))}
+                  {featured.map((business, idx) => {
+                    const distance = calculateBusinessDistance(business);
+                    return (
+                      <div key={business.id} className="min-w-[280px] w-[80%] md:w-[320px] snap-center">
+                        <BusinessCard 
+                          business={business} 
+                          distance={distance}
+                          layout="grid" 
+                          index={idx} 
+                        />
+                      </div>
+                    );
+                  })}
                   <div className="w-2" />
                 </div>
               </section>
             )}
 
-            {/* Offers Section */}
             {topOffers && topOffers.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-4 px-1">
@@ -314,7 +457,6 @@ export default function Home() {
           </>
         )}
 
-        {/* Visitor Counter */}
         {displayedVisitors > 0 && !isSearching && (
           <div className="flex items-center justify-center gap-2 py-3 mt-6" data-testid="visitor-counter">
             <Users className="w-4 h-4 text-muted-foreground" />
