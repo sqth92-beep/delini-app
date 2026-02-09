@@ -8,12 +8,23 @@ import { useI18n } from "@/lib/i18n";
 import { useFavorites } from "@/hooks/use-favorites";
 
 interface BusinessCardProps {
-  business: BusinessResponse & { distance?: number };
+  business: BusinessResponse;
   layout?: "grid" | "list";
   index?: number;
+  distance?: string; // ⬅️ أضفنا distance كـ string (مثل "3.2 كم")
 }
 
-function formatDistance(km: number, language: string): string {
+// عدّلنا function لتتقبل string أو number
+function formatDistance(distance: string | number | undefined, language: string): string {
+  if (distance === undefined || distance === null) return "";
+  
+  if (typeof distance === 'string') {
+    // إذا distance جاهزة كـ string (مثل "3.2 كم") نرجعها كما هي
+    return distance;
+  }
+  
+  // إذا distance كـ number (للتوافق مع الكود القديم)
+  const km = distance as number;
   if (km < 1) {
     const meters = Math.round(km * 1000);
     return language === "ar" ? `${meters} م` : `${meters}m`;
@@ -27,7 +38,7 @@ function addCacheBuster(url: string): string {
   return `${url}${separator}v=2`;
 }
 
-export function BusinessCard({ business, layout = "grid", index = 0 }: BusinessCardProps) {
+export function BusinessCard({ business, layout = "grid", index = 0, distance }: BusinessCardProps) {
   const { prefixLink } = usePreview();
   const { language } = useI18n();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -38,11 +49,29 @@ export function BusinessCard({ business, layout = "grid", index = 0 }: BusinessC
   const workingHours = parseWorkingHours(workingHoursJson);
   const isOpen = workingHours ? isBusinessOpen(workingHours) : null;
   const isFav = isFavorite(business.id);
+  
+  // المسافة تأتي من prop أو من business.distance (للتوافق)
+  const displayDistance = distance || (business as any).distance;
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     toggleFavorite(business.id);
+  };
+
+  // تحديد لون المسافة بناءً على القرب
+  const getDistanceColor = (distStr: string): string => {
+    if (!distStr) return "text-primary";
+    
+    // استخراج الرقم من النص (مثل "3.2 كم" → 3.2)
+    const match = distStr.match(/(\d+(\.\d+)?)/);
+    if (!match) return "text-primary";
+    
+    const km = parseFloat(match[1]);
+    
+    if (km < 3) return "text-green-600 dark:text-green-400"; // قريب جداً
+    if (km < 10) return "text-amber-600 dark:text-amber-400"; // متوسط
+    return "text-primary"; // بعيد
   };
 
   if (layout === "list") {
@@ -115,12 +144,12 @@ export function BusinessCard({ business, layout = "grid", index = 0 }: BusinessC
             <div className="mt-auto pt-2 flex items-center justify-between text-sm text-muted-foreground gap-2">
               <div className="flex items-center gap-1 truncate min-w-0">
                 <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{business.address || "العنوان غير متوفر"}</span>
+                <span className="truncate">{business.address || business.location || "العنوان غير متوفر"}</span>
               </div>
-              {business.distance !== undefined && (
-                <div className="flex items-center gap-1 text-primary text-xs font-medium flex-shrink-0">
-                  <Navigation className="w-3 h-3" />
-                  <span>{formatDistance(business.distance, language)}</span>
+              {displayDistance && (
+                <div className={`flex items-center gap-1 ${getDistanceColor(formatDistance(displayDistance, language))} text-xs font-medium flex-shrink-0`}>
+                  <Navigation className="w-4 h-4" />
+                  <span className="font-bold">{formatDistance(displayDistance, language)}</span>
                 </div>
               )}
             </div>
@@ -195,12 +224,12 @@ export function BusinessCard({ business, layout = "grid", index = 0 }: BusinessC
           <div className="mt-auto flex items-center justify-between text-sm text-muted-foreground gap-2 pt-3 border-t border-border/40">
             <div className="flex items-center gap-1.5 min-w-0">
               <MapPin className="w-4 h-4 text-primary/70 flex-shrink-0" />
-              <span className="line-clamp-1 text-xs">{business.address || "العنوان غير متوفر"}</span>
+              <span className="line-clamp-1 text-xs">{business.address || business.location || "العنوان غير متوفر"}</span>
             </div>
-            {business.distance !== undefined && (
-              <div className="flex items-center gap-1 text-primary text-xs font-medium flex-shrink-0">
-                <Navigation className="w-3 h-3" />
-                <span>{formatDistance(business.distance, language)}</span>
+            {displayDistance && (
+              <div className={`flex items-center gap-1 ${getDistanceColor(formatDistance(displayDistance, language))} text-xs font-medium flex-shrink-0`}>
+                <Navigation className="w-4 h-4" />
+                <span className="font-bold">{formatDistance(displayDistance, language)}</span>
               </div>
             )}
           </div>
