@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 
 export function SearchBar({ initialValue = "", onSearch }: { 
   initialValue?: string;
-  onSearch?: (query: string) => void; // ⬅️ أضف هذا
+  onSearch?: (query: string) => void;
 }) {
   const { t } = useI18n();
   const [value, setValue] = useState(initialValue);
@@ -16,12 +16,9 @@ export function SearchBar({ initialValue = "", onSearch }: {
     const query = value.trim();
     
     if (query) {
-      // ⬇️⬇️⬇️ عدّل هنا ⬇️⬇️⬇️
       if (onSearch) {
-        // إذا في دالة onSearch، نستدعيها (للبحث في Home)
         onSearch(query);
       } else {
-        // إذا ما في، نغير الـ URL عادي
         setLocation(`/search?q=${encodeURIComponent(query)}`);
       }
     } else {
