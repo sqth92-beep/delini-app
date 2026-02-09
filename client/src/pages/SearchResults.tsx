@@ -13,36 +13,77 @@ import { useGeolocation } from "@/hooks/use-geolocation";
 import { parseWorkingHours, isBusinessOpen } from "@shared/schema";
 import { Link } from "wouter";
 
+// وظيفة حساب المسافة
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return Math.round(distance * 10) / 10;
+}
+
+// جلب الموقع المحفوظ
+function getSavedLocation(): { latitude: number; longitude: number } | null {
+  const saved = localStorage.getItem('delini_user_location');
+  if (!saved) return null;
+  
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return null;
+  }
+}
+
 export default function SearchResults() {
   const { t, language } = useI18n();
   const [locationString] = useLocation();
   
-  // 🔧 FIXED: طريقة موثوقة لقراءة الـ query من الـ hash
-  const getQueryFromURL = () => {
+  // قراءة الـ query من الـ URL
+  const getQueryFromURL = (): string => {
     try {
-      // جرب من الـ hash أولاً (لـ Capacitor)
+      // 1. جرب من الـ hash (للتطبيقات)
       const hash = window.location.hash;
-      console.log("🔗 Window Hash:", hash);
-      console.log("🔗 locationString:", locationString);
       
       if (hash.includes('search?q=')) {
-        const start = hash.indexOf('q=') + 2;
-        const end = hash.indexOf('&') > -1 ? hash.indexOf('&') : hash.length;
-        const q = hash.substring(start, end);
-        const decoded = decodeURIComponent(q);
-        console.log("🔍 Query from hash:", decoded);
-        return decoded;
+        const qIndex = hash.indexOf('q=') + 2;
+        if (qIndex < 2) return "";
+        
+        let endIndex = hash.indexOf('&', qIndex);
+        if (endIndex === -1) endIndex = hash.length;
+        
+        const encodedQuery = hash.substring(qIndex, endIndex);
+        const decodedQuery = decodeURIComponent(encodedQuery);
+        console.log("🔍 Query from hash:", decodedQuery);
+        return decodedQuery;
       }
       
-      // إذا ما في hash، جرب الـ locationString
-      if (locationString.includes('?')) {
+      // 2. إذا ما في hash، جرب الـ locationString
+      if (locationString && locationString.includes('?')) {
         const params = new URLSearchParams(locationString.split('?')[1]);
-        const query = params.get('q')?.trim() || "";
+        const query = params.get('q') || "";
         console.log("🔍 Query from locationString:", query);
         return query;
       }
       
-      console.log("⚠️ No query found");
+      // 3. جرب الـ URL العادي
+      const urlParams = new URLSearchParams(window.location.search);
+      const query = urlParams.get('q') || "";
+      if (query) {
+        console.log("🔍 Query from URL params:", query);
+        return query;
+      }
+      
+      console.log("⚠️ No query found in URL");
       return "";
     } catch (error) {
       console.error("❌ Error parsing URL:", error);
@@ -62,16 +103,18 @@ export default function SearchResults() {
   const { latitude, longitude, loading: geoLoading, permissionDenied, requestLocation } = useGeolocation();
   const { data: cities } = useCities();
   
-  // 🔧 DEBUG: عرض الكلمة في الشاشة للإختبار
-  const debugInfo = `كلمة البحث: "${query || '(فارغ)'}" | عدد الحروف: ${query.length}`;
+  // جلب الموقع المحفوظ من localStorage
+  const userLocation = getSavedLocation();
+  
+  // معلومات ديبق
+  const debugInfo = `بحث: "${query || '(فارغ)'}" | حروف: ${query.length}`;
   
   useEffect(() => {
     console.log("=== SEARCH DEBUG ===");
     console.log("Query:", query);
+    console.log("User Location:", userLocation);
     console.log("Window URL:", window.location.href);
-    console.log("Window Hash:", window.location.hash);
-    console.log("Location String:", locationString);
-  }, [query, locationString]);
+  }, [query, userLocation]);
   
   const { data: businesses, isLoading, error } = useBusinesses({ 
     search: query,
@@ -82,17 +125,37 @@ export default function SearchResults() {
     sortByDistance,
   });
 
-  useEffect(() => {
-    if (businesses) {
-      console.log("✅ API Response - Businesses count:", businesses.length);
-      if (businesses.length > 0) {
-        console.log("📊 Businesses found:", businesses.map(b => b.name).join(', '));
+  // إضافة المسافات للنتائج
+  const businessesWithDistance = useMemo(() => {
+    if (!businesses || !userLocation) return businesses || [];
+    
+    return businesses.map(business => {
+      if (!business.latitude || !business.longitude) {
+        return { ...business, distance: undefined };
       }
+      
+      const distance = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        business.latitude,
+        business.longitude
+      );
+      
+      return {
+        ...business,
+        distance: distance > 0 ? `${distance} كم` : undefined
+      };
+    });
+  }, [businesses, userLocation]);
+
+  useEffect(() => {
+    if (businessesWithDistance) {
+      console.log("✅ Businesses with distance:", businessesWithDistance.length);
+      businessesWithDistance.forEach(b => {
+        console.log(`  - ${b.name}: ${b.distance || 'No distance'}`);
+      });
     }
-    if (error) {
-      console.error("❌ API Error:", error);
-    }
-  }, [businesses, error]);
+  }, [businessesWithDistance]);
 
   const ratingOptions = [
     { value: undefined, label: language === "ar" ? "الكل" : "All" },
@@ -115,8 +178,8 @@ export default function SearchResults() {
   const hasSearchQuery = query.length > 0;
 
   const filteredBusinesses = useMemo(() => {
-    if (!businesses) return [];
-    let result = [...businesses];
+    if (!businessesWithDistance) return [];
+    let result = [...businessesWithDistance];
     
     if (openNowOnly) {
       result = result.filter(b => {
@@ -129,21 +192,21 @@ export default function SearchResults() {
       result.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
     }
     
-    console.log("🎯 Filtered businesses:", result.length);
     return result;
-  }, [businesses, openNowOnly, sortByRating]);
+  }, [businessesWithDistance, openNowOnly, sortByRating]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black pb-20">
       <Header title={t("search.results")} backHref="/" />
       
       <main className="container mx-auto px-4 py-6">
-        {/* 🔧 DEBUG: شريط إختباري - إزله بعد التأكد */}
+        {/* شريط الديبق */}
         <div className="mb-4 p-3 bg-red-900/80 border border-red-700 rounded-lg">
           <div className="text-white text-sm font-mono">
             <div className="font-bold">🔍 حالة البحث:</div>
             <div>{debugInfo}</div>
             <div>عدد النتائج: {filteredBusinesses?.length || 0}</div>
+            <div>الموقع: {userLocation ? `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}` : 'غير محدد'}</div>
             <div className="text-xs opacity-70 mt-1">هذا الشريط للإختبار فقط وسيتم إزالته</div>
           </div>
         </div>
@@ -183,7 +246,7 @@ export default function SearchResults() {
           )}
         </div>
 
-        {/* 🔧 FIXED: Styled message when no search term */}
+        {/* رسالة إذا ما في كلمة بحث */}
         {!hasSearchQuery && !hasFilters && (
           <div className="mb-6 p-4 bg-gradient-to-r from-amber-900/30 to-amber-950/40 border border-amber-800/40 rounded-xl backdrop-blur-sm">
             <p className="text-amber-200 text-center font-medium text-sm">
@@ -209,7 +272,7 @@ export default function SearchResults() {
                     {language === "ar" ? "الترتيب حسب الموقع" : "Sort by Location"}
                   </label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {latitude && longitude ? (
+                    {userLocation ? (
                       <button
                         onClick={() => setSortByDistance(!sortByDistance)}
                         className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
@@ -355,7 +418,13 @@ export default function SearchResults() {
               }
             </h2>
             {filteredBusinesses.map((business, idx) => (
-              <BusinessCard key={business.id} business={business} layout="list" index={idx} />
+              <BusinessCard 
+                key={business.id} 
+                business={business} 
+                distance={(business as any).distance} // ⬅️ نرسل المسافة هنا
+                layout="list" 
+                index={idx} 
+              />
             ))}
           </div>
         ) : (
