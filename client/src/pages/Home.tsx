@@ -4,7 +4,7 @@ import { SearchBar } from "@/components/SearchBar";
 import { CategoryCard } from "@/components/CategoryCard";
 import { BusinessCard } from "@/components/BusinessCard";
 import { OfferCard } from "@/components/OfferCard";
-import { Loader2, ArrowLeft, Tag, Users, Search as SearchIcon, X, MapPin } from "lucide-react";
+import { ArrowLeft, Tag, Users, Search as SearchIcon, X, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useI18n } from "@/lib/i18n";
@@ -196,47 +196,9 @@ export default function Home() {
     return `${distance} كم`;
   };
 
-  const showLocationStatus = () => {
-    if (!userLocation) {
-      return (
-        <div className="flex items-center justify-center gap-2 py-2 bg-blue-50">
-          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-          <span className="text-sm text-blue-700">جاري تحديد موقعك...</span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center justify-center gap-2 py-2 bg-green-50">
-        <MapPin className="w-4 h-4 text-green-600" />
-        <span className="text-sm text-green-700">
-          موقعك محدد | 
-          <button
-            onClick={() => {
-              requestUserLocation().then(loc => {
-                if (loc) {
-                  setUserLocation(loc);
-                  toast({
-                    title: "تم تحديث الموقع",
-                    description: "المسافات محدثة الآن",
-                    duration: 2000,
-                  });
-                }
-              });
-            }}
-            className="mr-2 text-green-800 hover:underline text-xs"
-          >
-            تحديث
-          </button>
-        </span>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-background pb-20 font-sans">
       <Header />
-      {showLocationStatus()}
       
       <main className="container mx-auto px-4 py-6 space-y-10">
         
