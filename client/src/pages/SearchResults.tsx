@@ -3,96 +3,19 @@ import { useLocation } from "wouter";
 import { useBusinesses, useCities, useCategories } from "@/hooks/use-directory";
 import { Header, BottomNavigation } from "@/components/Navigation";
 import { BusinessCard } from "@/components/BusinessCard";
-import { SearchBar } from "@/components/SearchBar";
-import { RatingStars } from "@/components/RatingStars";
 import { Loader2, SearchX, Filter, Star, X, MapPin, Navigation, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "@/lib/i18n";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { parseWorkingHours, isBusinessOpen } from "@shared/schema";
-import { Link } from "wouter";
-
-// وظيفة حساب المسافة
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
-  
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-  
-  return Math.round(distance * 10) / 10;
-}
-
-// جلب الموقع المحفوظ
-function getSavedLocation(): { latitude: number; longitude: number } | null {
-  const saved = localStorage.getItem('delini_user_location');
-  if (!saved) return null;
-  
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return null;
-  }
-}
 
 export default function SearchResults() {
   const { t, language } = useI18n();
   const [locationString] = useLocation();
   
-  // قراءة الـ query من الـ URL
-  const getQueryFromURL = (): string => {
-    try {
-      // 1. جرب من الـ hash (للتطبيقات)
-      const hash = window.location.hash;
-      
-      if (hash.includes('search?q=')) {
-        const qIndex = hash.indexOf('q=') + 2;
-        if (qIndex < 2) return "";
-        
-        let endIndex = hash.indexOf('&', qIndex);
-        if (endIndex === -1) endIndex = hash.length;
-        
-        const encodedQuery = hash.substring(qIndex, endIndex);
-        const decodedQuery = decodeURIComponent(encodedQuery);
-        console.log("🔍 Query from hash:", decodedQuery);
-        return decodedQuery;
-      }
-      
-      // 2. إذا ما في hash، جرب الـ locationString
-      if (locationString && locationString.includes('?')) {
-        const params = new URLSearchParams(locationString.split('?')[1]);
-        const query = params.get('q') || "";
-        console.log("🔍 Query from locationString:", query);
-        return query;
-      }
-      
-      // 3. جرب الـ URL العادي
-      const urlParams = new URLSearchParams(window.location.search);
-      const query = urlParams.get('q') || "";
-      if (query) {
-        console.log("🔍 Query from URL params:", query);
-        return query;
-      }
-      
-      console.log("⚠️ No query found in URL");
-      return "";
-    } catch (error) {
-      console.error("❌ Error parsing URL:", error);
-      return "";
-    }
-  };
-  
-  const query = getQueryFromURL();
-
+  // حالة البحث الفوري
+  const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [minRating, setMinRating] = useState<number | undefined>(undefined);
   const [selectedCity, setSelectedCity] = useState<number | undefined>(undefined);
@@ -103,59 +26,42 @@ export default function SearchResults() {
   const { latitude, longitude, loading: geoLoading, permissionDenied, requestLocation } = useGeolocation();
   const { data: cities } = useCities();
   
-  // جلب الموقع المحفوظ من localStorage
-  const userLocation = getSavedLocation();
-  
-  // معلومات ديبق
-  const debugInfo = `بحث: "${query || '(فارغ)'}" | حروف: ${query.length}`;
-  
+  // قراءة الـ query من الـ URL أول مرة
   useEffect(() => {
-    console.log("=== SEARCH DEBUG ===");
-    console.log("Query:", query);
-    console.log("User Location:", userLocation);
-    console.log("Window URL:", window.location.href);
-  }, [query, userLocation]);
+    const getQueryFromURL = (): string => {
+      try {
+        const hash = window.location.hash;
+        if (hash.includes('search?q=')) {
+          const qIndex = hash.indexOf('q=') + 2;
+          if (qIndex < 2) return "";
+          
+          let endIndex = hash.indexOf('&', qIndex);
+          if (endIndex === -1) endIndex = hash.length;
+          
+          const encodedQuery = hash.substring(qIndex, endIndex);
+          const decodedQuery = decodeURIComponent(encodedQuery);
+          return decodedQuery;
+        }
+        return "";
+      } catch (error) {
+        return "";
+      }
+    };
+    
+    const initialQuery = getQueryFromURL();
+    if (initialQuery) {
+      setSearchTerm(initialQuery);
+    }
+  }, []);
   
   const { data: businesses, isLoading, error } = useBusinesses({ 
-    search: query,
+    search: searchTerm,
     minRating,
     cityId: selectedCity,
     userLat: latitude,
     userLng: longitude,
     sortByDistance,
   });
-
-  // إضافة المسافات للنتائج
-  const businessesWithDistance = useMemo(() => {
-    if (!businesses || !userLocation) return businesses || [];
-    
-    return businesses.map(business => {
-      if (!business.latitude || !business.longitude) {
-        return { ...business, distance: undefined };
-      }
-      
-      const distance = calculateDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        business.latitude,
-        business.longitude
-      );
-      
-      return {
-        ...business,
-        distance: distance > 0 ? `${distance} كم` : undefined
-      };
-    });
-  }, [businesses, userLocation]);
-
-  useEffect(() => {
-    if (businessesWithDistance) {
-      console.log("✅ Businesses with distance:", businessesWithDistance.length);
-      businessesWithDistance.forEach(b => {
-        console.log(`  - ${b.name}: ${b.distance || 'No distance'}`);
-      });
-    }
-  }, [businessesWithDistance]);
 
   const ratingOptions = [
     { value: undefined, label: language === "ar" ? "الكل" : "All" },
@@ -173,13 +79,16 @@ export default function SearchResults() {
     setSortByRating(false);
   };
 
+  const clearSearch = () => {
+    setSearchTerm("");
+  };
+
   const hasFilters = minRating !== undefined || selectedCity !== undefined || openNowOnly || sortByRating;
   const filterCount = [minRating, selectedCity, openNowOnly, sortByRating].filter(Boolean).length;
-  const hasSearchQuery = query.length > 0;
 
   const filteredBusinesses = useMemo(() => {
-    if (!businessesWithDistance) return [];
-    let result = [...businessesWithDistance];
+    if (!businesses) return [];
+    let result = [...businesses];
     
     if (openNowOnly) {
       result = result.filter(b => {
@@ -193,28 +102,66 @@ export default function SearchResults() {
     }
     
     return result;
-  }, [businessesWithDistance, openNowOnly, sortByRating]);
+  }, [businesses, openNowOnly, sortByRating]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black pb-20">
       <Header title={t("search.results")} backHref="/" />
       
       <main className="container mx-auto px-4 py-6">
-        {/* شريط الديبق */}
-        <div className="mb-4 p-3 bg-red-900/80 border border-red-700 rounded-lg">
-          <div className="text-white text-sm font-mono">
-            <div className="font-bold">🔍 حالة البحث:</div>
-            <div>{debugInfo}</div>
-            <div>عدد النتائج: {filteredBusinesses?.length || 0}</div>
-            <div>الموقع: {userLocation ? `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}` : 'غير محدد'}</div>
-            <div className="text-xs opacity-70 mt-1">هذا الشريط للإختبار فقط وسيتم إزالته</div>
+        {/* شريط البحث (منسوخ من Home.tsx) */}
+        <div className="max-w-lg mx-auto relative mb-6">
+          <div className="relative">
+            <div className="
+              relative flex items-center w-full h-14 rounded-2xl
+              bg-card shadow-lg border border-border/50
+              focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10
+              transition-all duration-300
+            ">
+              <div className="grid place-items-center h-full w-14 text-muted-foreground group-focus-within:text-primary transition-colors">
+                <Navigation className="w-6 h-6" />
+              </div>
+              <input
+                className="peer h-full w-full outline-none text-base text-foreground placeholder:text-muted-foreground bg-transparent ml-4 font-medium"
+                type="text"
+                id="search"
+                placeholder={t("search.placeholder") || "ابحث عن مطعم، محل، خدمة..."}
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') clearSearch();
+                }}
+                autoComplete="off"
+              />
+              {searchTerm && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute left-16 p-2 text-muted-foreground hover:text-foreground transition-colors"
+                  type="button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+              <button 
+                type="button"
+                className="
+                  absolute left-2 bg-primary text-white p-2.5 rounded-xl
+                  hover:bg-primary/90 hover:scale-105 active:scale-95
+                  transition-all duration-200
+                  shadow-lg shadow-primary/20
+                "
+              >
+                {t("search.button") || "بحث"}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="mb-6">
-          <SearchBar initialValue={query} />
-        </div>
-
+        {/* زر الفلاتر */}
         <div className="flex items-center gap-2 mb-6">
           <Button
             variant={showFilters ? "default" : "outline"}
@@ -246,17 +193,7 @@ export default function SearchResults() {
           )}
         </div>
 
-        {/* رسالة إذا ما في كلمة بحث */}
-        {!hasSearchQuery && !hasFilters && (
-          <div className="mb-6 p-4 bg-gradient-to-r from-amber-900/30 to-amber-950/40 border border-amber-800/40 rounded-xl backdrop-blur-sm">
-            <p className="text-amber-200 text-center font-medium text-sm">
-              {language === "ar" 
-                ? "🔍 اكتب في المربع أعلاه للبحث عن محلات معينة، أو استخدم الفلاتر للتصفية"
-                : "🔍 Type in the search box above to find specific businesses, or use filters to narrow results"}
-            </p>
-          </div>
-        )}
-
+        {/* الفلاتر */}
         <AnimatePresence>
           {showFilters && (
             <motion.div
@@ -272,7 +209,7 @@ export default function SearchResults() {
                     {language === "ar" ? "الترتيب حسب الموقع" : "Sort by Location"}
                   </label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {userLocation ? (
+                    {latitude && longitude ? (
                       <button
                         onClick={() => setSortByDistance(!sortByDistance)}
                         className={`px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
@@ -340,6 +277,7 @@ export default function SearchResults() {
                     </div>
                   </div>
                 )}
+
                 <div>
                   <label className="text-sm font-medium text-amber-300 mb-2 flex items-center gap-1">
                     <Star className="w-4 h-4 text-amber-400" />
@@ -400,6 +338,7 @@ export default function SearchResults() {
           )}
         </AnimatePresence>
 
+        {/* عرض النتائج */}
         {isLoading ? (
           <div className="flex justify-center pt-20">
             <div className="text-center">
@@ -413,21 +352,20 @@ export default function SearchResults() {
           <div className="space-y-4">
             <h2 className="text-sm font-medium text-amber-300 mb-2">
               {language === "ar" 
-                ? `${hasSearchQuery ? `نتائج البحث عن "${query}"` : "جميع المحلات"} (${filteredBusinesses.length} نتيجة)`
-                : `${hasSearchQuery ? `Results for "${query}"` : "All businesses"} (${filteredBusinesses.length} result${filteredBusinesses.length > 1 ? 's' : ''})`
+                ? `${searchTerm ? `نتائج البحث عن "${searchTerm}"` : "جميع المحلات"} (${filteredBusinesses.length} نتيجة)`
+                : `${searchTerm ? `Results for "${searchTerm}"` : "All businesses"} (${filteredBusinesses.length} result${filteredBusinesses.length > 1 ? 's' : ''})`
               }
             </h2>
             {filteredBusinesses.map((business, idx) => (
               <BusinessCard 
                 key={business.id} 
                 business={business} 
-                distance={(business as any).distance} // ⬅️ نرسل المسافة هنا
                 layout="list" 
                 index={idx} 
               />
             ))}
           </div>
-        ) : (
+        ) : searchTerm ? (
           <div className="flex flex-col items-center justify-center pt-20 text-center text-amber-300/80">
             <div className="relative mb-6">
               <SearchX className="w-20 h-20 opacity-20" />
@@ -438,42 +376,12 @@ export default function SearchResults() {
             </h3>
             <p className="max-w-md mb-6">
               {language === "ar" 
-                ? hasSearchQuery 
-                  ? `لم نتمكن من العثور على نتائج لـ "${query}"`
-                  : "لم نتمكن من العثور على أي محلات."
-                : hasSearchQuery
-                  ? `We couldn't find any results for "${query}"`
-                  : "We couldn't find any businesses."
+                ? `لم نتمكن من العثور على نتائج لـ "${searchTerm}"`
+                : `We couldn't find any results for "${searchTerm}"`
               }
             </p>
-            <p className="text-sm text-amber-300/60 mb-8">
-              {language === "ar" 
-                ? "جرب كلمات مفتاحية أخرى أو قم بتغيير الفلاتر."
-                : "Try different keywords or change the filters."
-              }
-            </p>
-            
-            {categories && categories.length > 0 && (
-              <div className="mt-6 w-full max-w-md">
-                <p className="text-sm font-medium mb-3 text-amber-300">
-                  {language === "ar" ? "تصفح الأقسام:" : "Browse categories:"}
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {categories.slice(0, 6).map((cat) => (
-                    <Link 
-                      key={cat.id}
-                      href={`/categories/${cat.id}`}
-                      className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-900/40 to-amber-950/40 text-amber-200 text-sm hover:from-amber-800/50 hover:to-amber-900/50 hover:text-amber-100 transition-all duration-200 border border-amber-800/30"
-                      data-testid={`suggestion-category-${cat.id}`}
-                    >
-                      {cat.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        )}
+        ) : null}
       </main>
 
       <BottomNavigation />
